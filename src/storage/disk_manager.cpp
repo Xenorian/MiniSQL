@@ -42,20 +42,76 @@ void DiskManager::WritePage(page_id_t logical_page_id, const char *page_data) {
 }
 
 page_id_t DiskManager::AllocatePage() {
-  ASSERT(false, "Not implemented yet.");
-  return INVALID_PAGE_ID;
+  DiskFileMetaPage *meta = (DiskFileMetaPage *)meta_data_;
+  page_id_t bitmap_phy_id = 0;
+  uint32_t inner_offset = 0;
+  BitmapPage<PAGE_SIZE> page;
+  memset(&page, 0, sizeof(page));
+
+  //full
+  if (meta->GetAllocatedPages() >= MAX_VALID_PAGE_ID)
+    return INVALID_PAGE_ID;
+
+  // edit the extent meta-data
+  uint32_t i = 0;
+  for (;i<MAX_VALID_EXTENT_ID;i++) {
+    if (meta->extent_used_page_[i] == BITMAP_SIZE)
+      continue;
+    else
+      break;
+  }
+
+  bitmap_phy_id = 1 + i * (BITMAP_SIZE+1);
+  //new extent
+  if (meta->num_extents_<=i) {
+    WritePhysicalPage(bitmap_phy_id, (char*)&page);
+  }
+  ReadPhysicalPage(bitmap_phy_id, (char *)&page);
+  page.AllocatePage(inner_offset);
+  WritePhysicalPage(bitmap_phy_id, (char *)&page);
+  //edit the file meta-data
+  (meta->extent_used_page_[i])++;
+  (meta->num_allocated_pages_)++;
+  if (meta->num_extents_ <= i) meta->num_extents_++;
+
+  return i * (BITMAP_SIZE) + inner_offset;
 }
 
 void DiskManager::DeAllocatePage(page_id_t logical_page_id) {
-  ASSERT(false, "Not implemented yet.");
+  DiskFileMetaPage *meta = (DiskFileMetaPage *)meta_data_;
+  page_id_t bitmap_phy_id = 0;
+  uint32_t inner_offset = 0;
+  BitmapPage<PAGE_SIZE> page;
+
+  // edit the extent meta-data
+  int i = logical_page_id/BITMAP_SIZE;
+  inner_offset = logical_page_id % BITMAP_SIZE;
+  bitmap_phy_id = 1 + i * (BITMAP_SIZE + 1);
+  ReadPhysicalPage(bitmap_phy_id, (char *)&page);
+  page.DeAllocatePage(inner_offset);
+  WritePhysicalPage(bitmap_phy_id, (char *)&page);
+  // edit the file meta-data
+  (meta->extent_used_page_[i])--;
+  (meta->num_allocated_pages_)--;
+  if (meta->extent_used_page_[i]==0) meta->num_extents_--;
+
 }
 
 bool DiskManager::IsPageFree(page_id_t logical_page_id) {
-  return false;
+  page_id_t bitmap_phy_id = 0;
+  uint32_t inner_offset = 0;
+  static BitmapPage<PAGE_SIZE> page;
+
+  //read the extent meta-data
+  int i = logical_page_id / BITMAP_SIZE;
+  inner_offset = logical_page_id % BITMAP_SIZE;
+  bitmap_phy_id = 1 + i * (BITMAP_SIZE + 1);
+  ReadPhysicalPage(bitmap_phy_id, (char *)&page);
+  return page.IsPageFree(inner_offset);
 }
 
 page_id_t DiskManager::MapPageId(page_id_t logical_page_id) {
-  return 0;
+  return logical_page_id + 2 + logical_page_id / BITMAP_SIZE;
 }
 
 int DiskManager::GetFileSize(const std::string &file_name) {
