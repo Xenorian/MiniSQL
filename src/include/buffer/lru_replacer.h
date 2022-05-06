@@ -2,6 +2,7 @@
 #define MINISQL_LRU_REPLACER_H
 
 #include <list>
+#include <unordered_map>
 #include <mutex>
 #include <unordered_set>
 #include <vector>
@@ -10,6 +11,10 @@
 #include "common/config.h"
 
 using namespace std;
+
+struct track_frame {
+
+};
 
 /**
  * LRUReplacer implements the Least Recently Used replacement policy.
@@ -37,6 +42,9 @@ public:
 
 private:
   // add your own private member variables here
+ list<frame_id_t> m_track;
+ unordered_map<frame_id_t, list<frame_id_t>::iterator> m_table;
+ size_t m_size;
 };
 
 #endif  // MINISQL_LRU_REPLACER_H
