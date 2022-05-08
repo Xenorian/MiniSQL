@@ -12,10 +12,6 @@
 
 using namespace std;
 
-struct track_frame {
-
-};
-
 /**
  * LRUReplacer implements the Least Recently Used replacement policy.
  */
