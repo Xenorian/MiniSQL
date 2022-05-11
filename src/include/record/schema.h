@@ -8,6 +8,13 @@
 #ifndef MINISQL_SCHEMA_H
 #define MINISQL_SCHEMA_H
 
+/*
+* data format:
+* magic
+* vector_size
+* column_data * n
+*/
+
 class Schema {
 public:
   explicit Schema(const std::vector<Column *> columns) : columns_(std::move(columns)) {}

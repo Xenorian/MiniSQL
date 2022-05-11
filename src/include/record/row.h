@@ -16,7 +16,7 @@
  * -------------------------------------------
  *  Header format:
  * --------------------------------------------
- * | Field Nums | Null bitmap |
+ * | Field Nums |
  * -------------------------------------------
  *  
  *
@@ -100,6 +100,7 @@ private:
   RowId rid_{};
   std::vector<Field *> fields_;   /** Make sure that all fields are created by mem heap */
   MemHeap *heap_{nullptr};
+  static constexpr uint32_t ROW_MAGIC_NUM = 1055820;
 };
 
 #endif //MINISQL_TUPLE_H

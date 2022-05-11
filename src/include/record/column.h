@@ -6,6 +6,12 @@
 #include "common/macros.h"
 #include "record/types.h"
 
+/*
+* data format:
+* uint32_t magic, string_leng
+* char*n name
+* uint32_t type, length, index, nullable, unique
+*/
 class Column {
   friend class Schema;
 
