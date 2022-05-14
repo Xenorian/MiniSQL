@@ -75,7 +75,34 @@ void TableHeap::ApplyDelete(const RowId &rid, Transaction *txn) {
   TablePage *the_page = reinterpret_cast<TablePage *>(buffer_pool_manager_->FetchPage(rid.GetPageId()));
   // Step2: Delete the tuple from the page.
   the_page->ApplyDelete(rid, txn, log_manager_);
+  // Step3: If the page is empty, delete the page.
+  RowId test_rid;
+
+  the_page->GetFirstTupleRid(&test_rid);
+  if (test_rid == INVALID_ROWID) {
+    TablePage *pre_page = nullptr;
+    if (the_page->GetPrevPageId() != INVALID_PAGE_ID)
+      pre_page = reinterpret_cast<TablePage *>(buffer_pool_manager_->FetchPage(the_page->GetPrevPageId()));
+    TablePage *next_page = nullptr;
+    if (the_page->GetNextPageId() != INVALID_PAGE_ID)
+      next_page = reinterpret_cast<TablePage *>(buffer_pool_manager_->FetchPage(the_page->GetNextPageId()));
+    
+    //if this page is the first page. not to delete it
+    if (pre_page == nullptr) {
+        //do nothing
+    } else {
+      if (next_page == nullptr) {
+        pre_page->SetNextPageId(INVALID_PAGE_ID);
+      } else {
+        pre_page->SetNextPageId(next_page->GetPageId());
+      }
+
+      buffer_pool_manager_->DeletePage(the_page->GetPageId());
+    }
+
+  }
 }
+
 
 void TableHeap::RollbackDelete(const RowId &rid, Transaction *txn) {
   // Find the page which contains the tuple.

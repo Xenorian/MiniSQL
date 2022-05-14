@@ -1,6 +1,7 @@
 #include "buffer/buffer_pool_manager.h"
 #include "glog/logging.h"
 #include "page/bitmap_page.h"
+#include <iostream>
 
 BufferPoolManager::BufferPoolManager(size_t pool_size, DiskManager *disk_manager)
         : pool_size_(pool_size), disk_manager_(disk_manager) {
@@ -24,6 +25,8 @@ Page *BufferPoolManager::FetchPage(page_id_t page_id) {
   frame_id_t new_frame_id = 0;
   // 1.1    If P exists, pin it and return it immediately.
   if(page_table_.count(page_id)==1) {
+    replacer_->Pin(page_id);
+    pages_[(*page_table_.find(page_id)).second].pin_count_++;
     return pages_ + (*page_table_.find(page_id)).second;
   }
   // 1.2    If P does not exist, find a replacement page (R) from either the free list or the replacer.
@@ -87,7 +90,11 @@ bool BufferPoolManager::DeletePage(page_id_t page_id) {
   // 1.   If P does not exist, return true.
   if (the_frame == page_table_.end()) return true;
   // 2.   If P exists, but has a non-zero pin-count, return false. Someone is using the page.
-  if (pages_[the_frame->second].pin_count_ != 0) return false;
+  if (pages_[the_frame->second].pin_count_ != 0) {
+      //for test
+    std::cerr << "pined cannot delete" << endl;
+    return false;
+  }
   // 3.   Otherwise, P can be deleted. Remove P from the page table, reset its metadata and return it to the free list.
   page_table_.erase(page_id);
   pages_[the_frame->second].ResetMemory();
@@ -98,6 +105,7 @@ bool BufferPoolManager::DeletePage(page_id_t page_id) {
 bool BufferPoolManager::UnpinPage(page_id_t page_id, bool is_dirty) {
   replacer_->Unpin((*page_table_.find(page_id)).second);
   pages_[(*page_table_.find(page_id)).second].is_dirty_ |= is_dirty;
+  pages_[(*page_table_.find(page_id)).second].pin_count_--;
   return true;
 }
 bool BufferPoolManager::FlushPage(page_id_t page_id) {
