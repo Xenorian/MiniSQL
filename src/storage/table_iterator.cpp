@@ -20,6 +20,9 @@ TableIterator::TableIterator(const TableIterator &other)
       record_now_(other.record_now_) {
   reinterpret_cast<TablePage *>(buffer_pool_manager_->FetchPage(record_id_now_.GetPageId()))
       ->GetTuple(&record_now_, schema_, txn, lock_manager_);
+  //i don't know whether the page is edited or not
+  //except add a mark when * it
+  buffer_pool_manager_->UnpinPage(record_id_now_.GetPageId(), true);
 }
 
 TableIterator::~TableIterator() {}
@@ -43,6 +46,7 @@ TableIterator &TableIterator::operator++() {
   if(reinterpret_cast<TablePage *>(buffer_pool_manager_->FetchPage(record_id_now_.GetPageId()))
           ->GetTuple(&record_now_, schema_, txn, lock_manager_) == false) {
     //try to get the first tuple in next page
+    RowId old_row = record_id_now_;
     record_id_now_.Set(
         reinterpret_cast<TablePage *>(buffer_pool_manager_->FetchPage(record_id_now_.GetPageId()))->GetNextPageId(), 0);
 
@@ -51,6 +55,11 @@ TableIterator &TableIterator::operator++() {
     //get the tuple
     reinterpret_cast<TablePage *>(buffer_pool_manager_->FetchPage(record_id_now_.GetPageId()))
         ->GetTuple(&record_now_, schema_, txn, lock_manager_);
+
+    buffer_pool_manager_->UnpinPage(old_row.GetPageId(), true);
+    buffer_pool_manager_->UnpinPage(record_id_now_.GetPageId(), true);
+  } else {
+    buffer_pool_manager_->UnpinPage(record_id_now_.GetPageId(), true);
   }
   return *this;
 }
@@ -64,6 +73,7 @@ TableIterator TableIterator::operator++(int) { // point to the next slot
   if (reinterpret_cast<TablePage *>(buffer_pool_manager_->FetchPage(record_id_now_.GetPageId()))
           ->GetTuple(&record_now_, schema_, txn, lock_manager_) == false) {
     // try to get the first tuple in next page
+    RowId old_row = record_id_now_;
     record_id_now_.Set(
         reinterpret_cast<TablePage *>(buffer_pool_manager_->FetchPage(record_id_now_.GetPageId()))->GetNextPageId(), 0);
 
@@ -72,6 +82,11 @@ TableIterator TableIterator::operator++(int) { // point to the next slot
     // get the tuple
     reinterpret_cast<TablePage *>(buffer_pool_manager_->FetchPage(record_id_now_.GetPageId()))
         ->GetTuple(&record_now_, schema_, txn, lock_manager_);
+
+    buffer_pool_manager_->UnpinPage(old_row.GetPageId(), true);
+    buffer_pool_manager_->UnpinPage(record_id_now_.GetPageId(), true);
+  } else {
+    buffer_pool_manager_->UnpinPage(record_id_now_.GetPageId(), true);
   }
   return TableIterator(tmp);
 }
