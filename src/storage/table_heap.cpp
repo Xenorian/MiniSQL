@@ -1,10 +1,44 @@
 # include "storage/table_heap.h"
 
 bool TableHeap::InsertTuple(Row &row, Transaction *txn) {
-  for (auto iter = Begin(txn); iter != End(); iter++) {
-    
+  auto cur_page = static_cast<TablePage *>(buffer_pool_manager_->FetchPage(first_page_id_)); // get the pointer to the first page
+  if (cur_page == nullptr) {
+    return false;
   }
-  return false;
+  // Insert into the first page with enough space. If no such page exists, create a new page and insert into that.
+  cur_page->WLatch();
+  
+  while (!cur_page->InsertTuple(row, schema_, txn, lock_manager_, log_manager_)) { 
+    // cannot insert into the current page
+    auto next_page_id = cur_page->GetNextPageId(); //get id of the next page
+    if (next_page_id != INVALID_PAGE_ID) {
+      // Unlatch and unpin the current page
+      cur_page->WUnlatch();
+      buffer_pool_manager_->UnpinPage(cur_page->GetTablePageId(), false);
+      // turn to the next page
+      cur_page = static_cast<TablePage *>(buffer_pool_manager_->FetchPage(next_page_id));
+      cur_page->WLatch();
+    } 
+    else { // no such page exist: create a new page
+      auto new_page = static_cast<TablePage *>(buffer_pool_manager_->NewPage(next_page_id));
+      // If we could not create a new page
+      if (new_page == nullptr) {
+        cur_page->WUnlatch();
+        buffer_pool_manager_->UnpinPage(cur_page->GetTablePageId(), false);
+        return false;
+      }
+      // Initialize the new page and insert
+      new_page->WLatch();
+      cur_page->SetNextPageId(next_page_id);
+      new_page->Init(next_page_id, cur_page->GetTablePageId(), log_manager_, txn);
+      cur_page->WUnlatch();
+      buffer_pool_manager_->UnpinPage(cur_page->GetTablePageId(), true);
+      cur_page = new_page;
+    }
+  }
+  cur_page->WUnlatch();
+  buffer_pool_manager_->UnpinPage(cur_page->GetTablePageId(), true);
+  return true;
 }
 
 bool TableHeap::MarkDelete(const RowId &rid, Transaction *txn) {
@@ -22,8 +56,26 @@ bool TableHeap::MarkDelete(const RowId &rid, Transaction *txn) {
   return true;
 }
 
-bool TableHeap::UpdateTuple(const Row &row, const RowId &rid, Transaction *txn) {
-  return false;
+bool TableHeap::UpdateTuple(Row &row, const RowId &rid, Transaction *txn) {
+  // find the page which contains the tuple
+  auto page = reinterpret_cast<TablePage *>(buffer_pool_manager_->FetchPage(rid.GetPageId()));
+  // cannot be found
+  if (page == nullptr) {
+    return false;
+  }
+  // update the tuple
+  Row old_tuple(rid);
+  page->WLatch();
+  int is_updated = page->UpdateTuple(row, &old_tuple, schema_, txn, lock_manager_, log_manager_);  // -1:invalid; 0:space not enough; 1:success
+  page->WUnlatch();
+  buffer_pool_manager_->UnpinPage(page->GetTablePageId(), is_updated>0);
+  if(is_updated){ //-1 or 1
+    return is_updated;
+  }
+  else{ //delete & insert
+    MarkDelete(rid, txn); //delete
+    return InsertTuple(row, txn);
+  }
 }
 
 void TableHeap::ApplyDelete(const RowId &rid, Transaction *txn) {
@@ -50,9 +102,11 @@ void TableHeap::RollbackDelete(const RowId &rid, Transaction *txn) {
 }
 
 void TableHeap::FreeHeap() {
-  auto cur_page = first_page_id_; 
-  while(cur_page != INVALID_PAGE_ID){
-    ;
+  auto cur_page = first_page_id_;
+  while (cur_page != INVALID_PAGE_ID) {
+    auto next_page = reinterpret_cast<TablePage *>(buffer_pool_manager_->FetchPage(cur_page))->GetNextPageId();
+    buffer_pool_manager_->DeletePage(cur_page);
+    cur_page = next_page;
   }
 }
 
