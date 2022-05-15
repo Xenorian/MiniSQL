@@ -4,6 +4,9 @@
 #include "common/rowid.h"
 #include "record/row.h"
 #include "transaction/transaction.h"
+#include "buffer/buffer_pool_manager.h"
+#include "transaction/log_manager.h"
+#include "transaction/lock_manager.h"
 
 
 class TableHeap;

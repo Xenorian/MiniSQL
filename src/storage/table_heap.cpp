@@ -112,7 +112,7 @@ void TableHeap::FreeHeap() {
 
 bool TableHeap::GetTuple(Row *row, Transaction *txn) {
   auto page = reinterpret_cast<TablePage *>(buffer_pool_manager_->FetchPage((row->GetRowId()).GetPageId()));
-  if(page != nullptr){ // CANNOT find the tuple with RowId == row.rid_
+  if(page == nullptr){ // CANNOT find the tuple with RowId == row.rid_
     return false;
   }
   //read the tuple

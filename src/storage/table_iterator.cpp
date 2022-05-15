@@ -5,7 +5,7 @@
 TableIterator::TableIterator(BufferPoolManager *buffer_pool_manager, Schema *schema, LogManager *log_manager,
 LockManager *lock_manager, RowId row_record)
   : buffer_pool_manager_(buffer_pool_manager),
-    schema_(schema_),
+    schema_(schema),
     log_manager_(log_manager),
     lock_manager_(lock_manager),
     row_record_(row_record),
@@ -32,11 +32,11 @@ bool TableIterator::operator!=(const TableIterator &itr) const {
 
 const Row &TableIterator::operator*() {
   // ASSERT(false, "Not implemented yet.");
-  return Row(row_record_);
+  return tuple;
 }
 
 Row *TableIterator::operator->() {
-  return new Row(row_record_);
+  return &tuple;
 }
 
 TableIterator &TableIterator::operator++() {
