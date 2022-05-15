@@ -85,6 +85,7 @@ public:
   inline void SetRowId(RowId rid) { rid_ = rid; }
 
   inline std::vector<Field *> &GetFields() { return fields_; }
+  inline std::vector<Field *> GetFields_read_only() const { return fields_; }
 
   inline Field *GetField(uint32_t idx) const {
     ASSERT(idx < fields_.size(), "Failed to access field");

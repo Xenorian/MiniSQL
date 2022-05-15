@@ -22,9 +22,13 @@ public:
 
   virtual ~TableIterator();
 
-  inline bool operator==(const TableIterator &itr) const;
+  inline bool operator==(const TableIterator &itr) const { return (this->record_now_.GetRowId() == itr.record_now_.GetRowId()); };
 
-  inline bool operator!=(const TableIterator &itr) const;
+  inline bool operator!=(const TableIterator &itr) const {
+    return (this->record_now_.GetRowId().Get() != itr.record_now_.GetRowId().Get());
+  };
+
+  TableIterator &operator=(const TableIterator &other);
 
   const Row &operator*();
 
@@ -41,7 +45,7 @@ private:
  LogManager *log_manager_;
  LockManager *lock_manager_;
  Transaction *txn;
- RowId record_id_now_;
+ //RowId record_id_now_;
  Row record_now_;
 };
 

@@ -26,7 +26,8 @@ Page *BufferPoolManager::FetchPage(page_id_t page_id) {
   // 1.1    If P exists, pin it and return it immediately.
   if(page_table_.count(page_id)==1) {
     replacer_->Pin(page_id);
-    pages_[(*page_table_.find(page_id)).second].pin_count_++;
+    if (pages_[(*page_table_.find(page_id)).second].pin_count_ < 0) std::cerr << "pin count < 0" << std::endl;
+    pages_[(*page_table_.find(page_id)).second].pin_count_ = 1;
     return pages_ + (*page_table_.find(page_id)).second;
   }
   // 1.2    If P does not exist, find a replacement page (R) from either the free list or the replacer.

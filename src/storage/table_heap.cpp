@@ -73,6 +73,7 @@ bool TableHeap::UpdateTuple(Row &row, const RowId &rid, Transaction *txn) {
   }
 
   //update success
+  row.SetRowId(rid);
   buffer_pool_manager_->UnpinPage(rid.GetPageId(), true);
   return true;
 }
@@ -82,6 +83,9 @@ void TableHeap::ApplyDelete(const RowId &rid, Transaction *txn) {
   TablePage *the_page = reinterpret_cast<TablePage *>(buffer_pool_manager_->FetchPage(rid.GetPageId()));
   // Step2: Delete the tuple from the page.
   the_page->ApplyDelete(rid, txn, log_manager_);
+
+  /*
+  * //not to delete the page
   // Step3: If the page is empty, delete the page.
   RowId test_rid;
   bool deleted = false;
@@ -113,6 +117,8 @@ void TableHeap::ApplyDelete(const RowId &rid, Transaction *txn) {
     if (next_page != nullptr) buffer_pool_manager_->UnpinPage(next_page->GetPageId(), true);
   }
   if (deleted == false) buffer_pool_manager_->UnpinPage(the_page->GetPageId(), true);
+  */
+
 }
 
 
