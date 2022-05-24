@@ -74,6 +74,7 @@ Page *BufferPoolManager::NewPage(page_id_t &page_id) {
   
   // 3.   Update P's metadata, zero out memory and add P to the page table.
   pages_[new_frame_id].ResetMemory();
+  pages_[new_frame_id].pin_count_ = 1;
   pages_[new_frame_id].is_dirty_ = 0;
   pages_[new_frame_id].page_id_ = page_id;
 
@@ -106,7 +107,7 @@ bool BufferPoolManager::DeletePage(page_id_t page_id) {
 bool BufferPoolManager::UnpinPage(page_id_t page_id, bool is_dirty) {
   replacer_->Unpin((*page_table_.find(page_id)).second);
   pages_[(*page_table_.find(page_id)).second].is_dirty_ |= is_dirty;
-  pages_[(*page_table_.find(page_id)).second].pin_count_--;
+  pages_[(*page_table_.find(page_id)).second].pin_count_ = 0;
   return true;
 }
 bool BufferPoolManager::FlushPage(page_id_t page_id) {

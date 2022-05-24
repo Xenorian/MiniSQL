@@ -57,6 +57,7 @@ public:
   bool Check();
 
   // destroy the b plus tree
+  void Destroy_subtree(page_id_t root);
   void Destroy();
 
   void PrintTree(std::ofstream &out) {
@@ -69,6 +70,8 @@ public:
     ToGraph(node, buffer_pool_manager_, out);
     out << "}" << std::endl;
   }
+
+  //bool my_less_than(KeyType &a, KeyType &b) { return comparator_(a, b) < 0;}
 
 private:
   void StartNewTree(const KeyType &key, const ValueType &value);

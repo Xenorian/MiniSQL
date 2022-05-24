@@ -6,8 +6,51 @@
 #include "utils/utils.h"
 
 static const std::string db_name = "bp_tree_insert_test.db";
+TEST(BPlusTreeTests, Insert) {
+  // Init engine
+  DBStorageEngine engine(db_name);
+  BasicComparator<int> comparator;
+  BPlusTree<int, int, BasicComparator<int>> tree(0, engine.bpm_, comparator, 4, 4);
+  TreeFileManagers mgr("tree_");
+  // Prepare data
+  const int n = 20;
+  vector<int> keys;
+  vector<int> values;
+  vector<int> delete_seq;
+  map<int, int> kv_map;
+  for (int i = 0; i < n; i++) {
+    keys.push_back(i);
+    values.push_back(i);
+    delete_seq.push_back(i);
+  }
+  // Shuffle data
+  //ShuffleArray(keys);
+ // ShuffleArray(values);
+  //ShuffleArray(delete_seq);
+  // Map key value
+  for (int i = 0; i < n; i++) {
+    kv_map[keys[i]] = values[i];
+  }
+  // Insert data
+  for (int i = 0; i < n; i++) {
+    tree.Insert(keys[i], values[i]);
+    tree.PrintTree(mgr[0]);
+    tree.Check();
+  }
 
-TEST(BPlusTreeTests, SampleTest) {
+  ASSERT_TRUE(tree.Check());
+  // Print tree
+  tree.PrintTree(mgr[0]);
+  // Search keys
+  vector<int> ans;
+  for (int i = 0; i < n; i++) {
+    tree.GetValue(i, ans);
+    ASSERT_EQ(kv_map[i], ans[i]);
+  }
+  ASSERT_TRUE(tree.Check());
+}
+
+TEST(BPlusTreeTests, DISABLED_SampleTest) {
   // Init engine
   DBStorageEngine engine(db_name);
   BasicComparator<int> comparator;

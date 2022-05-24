@@ -13,9 +13,9 @@
  * | HEADER | KEY(1) + RID(1) | KEY(2) + RID(2) | ... | KEY(n) + RID(n)
  *  ----------------------------------------------------------------------
  *
- *  Header format (size in byte, 24 bytes in total):
+ *  Header format (size in byte, 28 bytes in total):
  *  ---------------------------------------------------------------------
- * | PageType (4) | CurrentSize (4) | MaxSize (4) | ParentPageId (4) |
+ * | PageType (4) | LSN(4) |CurrentSize (4) | MaxSize (4) | ParentPageId (4) |
  *  ---------------------------------------------------------------------
  *  ------------------------------
  * | PageId (4) | NextPageId (4)
@@ -25,6 +25,8 @@
 #include <vector>
 
 #include "page/b_plus_tree_page.h"
+#include "index/generic_key.h"
+#include "index/basic_comparator.h"
 
 #define B_PLUS_TREE_LEAF_PAGE_TYPE BPlusTreeLeafPage<KeyType, ValueType, KeyComparator>
 #define LEAF_PAGE_HEADER_SIZE 28
@@ -64,7 +66,10 @@ public:
 
   void MoveLastToFrontOf(BPlusTreeLeafPage *recipient);
 
+  int my_lower_bound(const KeyType &key,const  KeyComparator &comp) const;
+
 private:
+
   void CopyNFrom(MappingType *items, int size);
 
   void CopyLastFrom(const MappingType &item);
@@ -72,7 +77,6 @@ private:
   void CopyFirstFrom(const MappingType &item);
 
   page_id_t next_page_id_;
-  MappingType array_[0];
+  MappingType array_[LEAF_PAGE_SIZE];
 };
-
 #endif  // MINISQL_B_PLUS_TREE_LEAF_PAGE_H
