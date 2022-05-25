@@ -44,23 +44,11 @@ void B_PLUS_TREE_LEAF_PAGE_TYPE::SetNextPageId(page_id_t next_page_id) { next_pa
  */
 INDEX_TEMPLATE_ARGUMENTS
 int B_PLUS_TREE_LEAF_PAGE_TYPE::KeyIndex(const KeyType &key, const KeyComparator &comparator) const { 
-  int start = 0;
-  int end = GetSize();
-  int mid = (start + end) / 2;
-  while (start <= end) {
-    if (comparator(key, array_[mid].first) < 0) {
-      end = mid - 1;
-      mid = (start + end) / 2;
-    } else if (comparator(key, array_[mid].first) == 0) {
-      break;
-    } else {
-      start = mid + 1;
-      mid = (start + end) / 2;
-    }
-  }
-
-  ASSERT(start <= end, "NOT FOUND");
-  return mid;
+  int place = 0;
+  place = my_lower_bound(key, comparator) - 1;
+  ASSERT(place >= 0, "NOT FOUND");
+  ASSERT(comparator(KeyAt(place), key) == 0, "NOT FOUND");
+  return place;
 }
 
 /*
@@ -86,19 +74,24 @@ const MappingType &B_PLUS_TREE_LEAF_PAGE_TYPE::GetItem(int index) {
 }
 
 INDEX_TEMPLATE_ARGUMENTS
-int B_PLUS_TREE_LEAF_PAGE_TYPE::my_lower_bound(const KeyType& key, const KeyComparator& comp) const {
+int B_PLUS_TREE_LEAF_PAGE_TYPE::my_lower_bound(const KeyType& key, const KeyComparator& comparator) const {
   if (GetSize() == 0) return 0;
-    
-  int start = 0, end = GetSize() - 1, mid = 0;
-  while (start < end) {
-    mid = start + (end-start) / 2;
-    if (comp(array_[mid].first,key)>=0) {
-      end = mid;
-    } else
-      start = mid + 1;
+
+  int place = 0;
+  int i = 0;
+  if (comparator(key, array_[0].first) < 0)
+    place = 0;
+  else {
+    for (i = 1; i <= GetSize() - 1; i++) {
+      if (comparator(key, array_[i].first) >= 0) {
+        continue;
+      } else {
+        break;
+      }
+    }
   }
-  if (comp(array_[start].first,key)<0) start++;
-  return start;
+  place = i;
+  return place;
 }
 
 /*****************************************************************************
@@ -116,9 +109,9 @@ int B_PLUS_TREE_LEAF_PAGE_TYPE::Insert(const KeyType &key, const ValueType &valu
   }
 
   int place = my_lower_bound(key, comparator);
-  int start = place + 1;
+  int start = place;
   int end = GetSize();
-  for (int i = end; i >= start; i--) array_[i] = array_[i - 1];
+  for (int i = end; i >= start+1; i--) array_[i] = array_[i - 1];
   array_[place].first = key;
   array_[place].second = value;
   //set the size
@@ -169,9 +162,10 @@ void B_PLUS_TREE_LEAF_PAGE_TYPE::CopyNFrom(MappingType *items, int size) {
  */
 INDEX_TEMPLATE_ARGUMENTS
 bool B_PLUS_TREE_LEAF_PAGE_TYPE::Lookup(const KeyType &key, ValueType &value, const KeyComparator &comparator) const {
-  int index = my_lower_bound( key, comparator);
+  int index = my_lower_bound( key, comparator) - 1;
   bool flag = false;
-  if (comparator(array_[index].first,key)==0) {
+  if (index == -1) flag = false;
+  else if (comparator(array_[index].first,key)==0) {
     flag = true;
     value = array_[index].second;
   } else {

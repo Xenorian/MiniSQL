@@ -69,73 +69,31 @@ INDEX_TEMPLATE_ARGUMENTS
 ValueType B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(const KeyType &key, const KeyComparator &comparator) const {
   // replace with your own code
   ValueType val{};
-  /* O(N)
-  ValueType val{};
-  for (int i = 0; i < GetMaxSize()-1;i++) {
-    if (comparator(key, array_[i + 1].first) >= 0) {
-      continue;
-    } else {
-      break;
-    }
-  }
-
-  val = array_[i].second;
-  return val;
-  */
-  int start = 0;
-  int end = GetSize() - 1;
-  int mid = (start + end) / 2;
-  while (start<=end) {
-    if (comparator(key, array_[mid].first)<0) {
-      end = mid - 1;
-      mid = (start + end) / 2;
-    } else if (comparator(key, array_[mid].first) == 0) {
-      break;
-    } else {
-      start = mid + 1;
-      mid = (start + end) / 2;
-    }
-  }
-  val = array_[mid].second;
-  ASSERT(start <= end, "NOT FOUND");
+  // O(N)
+  int place = my_lower_bound(key, comparator);
+  val = ValueAt(place);
   return val;
 }
 
 INDEX_TEMPLATE_ARGUMENTS
-int B_PLUS_TREE_INTERNAL_PAGE_TYPE::my_lower_bound(const KeyType &key,const KeyComparator &comp) const {
+int B_PLUS_TREE_INTERNAL_PAGE_TYPE::my_lower_bound(const KeyType &key,const KeyComparator &comparator) const {
   if (GetSize() == 0) return 0;
-  if (comp(array_[1].first, key) > 0) return 0;
 
-  int start = 0, end = GetSize() - 1, mid = 0;
-  while (start < end) {
-    mid = start + (end-start) / 2;
-    if (comp(array_[mid].first, key) >= 0) {
-      end = mid;
-    } else
-      start = mid + 1;
-  }
-  //if (comp(array_[start].first, key) < 0) start++;
-  return start;
-}
-
-INDEX_TEMPLATE_ARGUMENTS
-int B_PLUS_TREE_INTERNAL_PAGE_TYPE::KeyIndex(const KeyType &key, const KeyComparator &comparator) const {
-  int start = 0;
-  int end = GetSize() - 1;
-  int mid = (start + end) / 2;
-  while (start <= end) {
-    if (comparator(key, array_[mid].first) < 0) {
-      end = mid - 1;
-      mid = (start + end) / 2;
-    } else if (comparator(key, array_[mid].first) == 0) {
-      break;
-    } else {
-      start = mid + 1;
-      mid = (start + end) / 2;
+  int place = 0;
+  int i = 0;
+  if (comparator(key, array_[1].first) < 0)
+    place = 0;
+  else {
+    for (i = 1; i <= GetSize() - 2; i++) {
+      if (comparator(key, array_[i + 1].first) >= 0) {
+        continue;
+      } else {
+        break;
+      }
     }
   }
-  ASSERT(start <= end, "NOT FOUND");
-  return mid;
+  place = i;
+  return place;
 }
 
 /*****************************************************************************
@@ -148,9 +106,10 @@ int B_PLUS_TREE_INTERNAL_PAGE_TYPE::KeyIndex(const KeyType &key, const KeyCompar
  * NOTE: This method is only called within InsertIntoParent()(b_plus_tree.cpp)
  */
 INDEX_TEMPLATE_ARGUMENTS
-void B_PLUS_TREE_INTERNAL_PAGE_TYPE::PopulateNewRoot(const ValueType &old_value, const KeyType &new_key,
+void B_PLUS_TREE_INTERNAL_PAGE_TYPE::PopulateNewRoot(const KeyType &old_key ,const ValueType &old_value,
+                                                     const KeyType &new_key,
                                                      const ValueType &new_value) {
-  // array_[0].first = INVALID;
+  array_[0].first = old_key;
   array_[0].second = old_value;
   array_[1].first = new_key;
   array_[1].second = new_value;

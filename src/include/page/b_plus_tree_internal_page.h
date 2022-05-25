@@ -40,7 +40,8 @@ public:
 
   int KeyIndex(const KeyType &key, const KeyComparator &comparator) const;
 
-  void PopulateNewRoot(const ValueType &old_value, const KeyType &new_key, const ValueType &new_value);
+  void PopulateNewRoot(const KeyType &old_key, const ValueType &old_value, const KeyType &new_key,
+                       const ValueType &new_value);
 
   int InsertNodeAfter(const ValueType &old_value, const KeyType &new_key, const ValueType &new_value);
 

@@ -13,7 +13,7 @@ TEST(BPlusTreeTests, Insert) {
   BPlusTree<int, int, BasicComparator<int>> tree(0, engine.bpm_, comparator, 4, 4);
   TreeFileManagers mgr("tree_");
   // Prepare data
-  const int n = 20;
+  const int n = 100;
   vector<int> keys;
   vector<int> values;
   vector<int> delete_seq;
@@ -24,9 +24,9 @@ TEST(BPlusTreeTests, Insert) {
     delete_seq.push_back(i);
   }
   // Shuffle data
-  //ShuffleArray(keys);
- // ShuffleArray(values);
-  //ShuffleArray(delete_seq);
+  ShuffleArray(keys);
+  ShuffleArray(values);
+  ShuffleArray(delete_seq);
   // Map key value
   for (int i = 0; i < n; i++) {
     kv_map[keys[i]] = values[i];
@@ -34,7 +34,7 @@ TEST(BPlusTreeTests, Insert) {
   // Insert data
   for (int i = 0; i < n; i++) {
     tree.Insert(keys[i], values[i]);
-    tree.PrintTree(mgr[0]);
+    //tree.PrintTree(mgr[0]);
     tree.Check();
   }
 
