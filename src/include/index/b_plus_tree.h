@@ -51,7 +51,7 @@ public:
   INDEXITERATOR_TYPE End();
 
   // expose for test purpose
-  Page *FindLeafPage(const KeyType &key, bool leftMost = false);
+  LeafPage *FindLeafPage(const KeyType &key);
 
   // used to check whether all pages are unpinned
   bool Check();
@@ -88,11 +88,12 @@ private:
   bool CoalesceOrRedistribute(N *node, Transaction *transaction = nullptr);
 
   template<typename N>
-  bool Coalesce(N **neighbor_node, N **node, BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator> **parent,
+  bool Coalesce(N *neighbor_node, N *node, BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator> *parent, int max_index,
                 int index, Transaction *transaction = nullptr);
 
   template<typename N>
-  void Redistribute(N *neighbor_node, N *node, int index);
+  void Redistribute(N *neighbor_node, N *node, BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator> *parent,
+                    int max_index, int index);
 
   bool AdjustRoot(BPlusTreePage *node);
 

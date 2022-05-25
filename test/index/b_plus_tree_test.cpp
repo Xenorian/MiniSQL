@@ -18,15 +18,15 @@ TEST(BPlusTreeTests, Insert) {
   vector<int> values;
   vector<int> delete_seq;
   map<int, int> kv_map;
-  for (int i = 0; i < n; i++) {
+  for (int i = n - 1; i >=0 ; i--) {
     keys.push_back(i);
     values.push_back(i);
     delete_seq.push_back(i);
   }
   // Shuffle data
-  ShuffleArray(keys);
-  ShuffleArray(values);
-  ShuffleArray(delete_seq);
+  //ShuffleArray(keys);
+  //ShuffleArray(values);
+  //ShuffleArray(delete_seq);
   // Map key value
   for (int i = 0; i < n; i++) {
     kv_map[keys[i]] = values[i];
@@ -34,7 +34,7 @@ TEST(BPlusTreeTests, Insert) {
   // Insert data
   for (int i = 0; i < n; i++) {
     tree.Insert(keys[i], values[i]);
-    //tree.PrintTree(mgr[0]);
+    tree.PrintTree(mgr[i]);
     tree.Check();
   }
 
@@ -50,14 +50,50 @@ TEST(BPlusTreeTests, Insert) {
   ASSERT_TRUE(tree.Check());
 }
 
-TEST(BPlusTreeTests, DISABLED_SampleTest) {
+TEST(BPlusTreeTests, DeleteTest) {
   // Init engine
   DBStorageEngine engine(db_name);
   BasicComparator<int> comparator;
   BPlusTree<int, int, BasicComparator<int>> tree(0, engine.bpm_, comparator, 4, 4);
   TreeFileManagers mgr("tree_");
   // Prepare data
-  const int n = 30;
+  const int n = 15;
+  vector<int> keys;
+  vector<int> values;
+  vector<int> delete_seq;
+  map<int, int> kv_map;
+  for (int i = 0; i < n; i++) {
+    keys.push_back(i);
+    values.push_back(i);
+    delete_seq.push_back(i);
+  }
+
+  // Insert data
+  for (int i = 0; i < n; i++) {
+    tree.Insert(keys[i], values[i]);
+  }
+  ASSERT_TRUE(tree.Check());
+  // Print tree
+  tree.PrintTree(mgr[0]);
+
+  // Delete half keys
+  for (int i = 0; i < n; i++) {
+    tree.Remove(delete_seq[i]);
+    ASSERT_TRUE(tree.Check());
+    tree.PrintTree(mgr[1]);
+  }
+  tree.PrintTree(mgr[1]);
+  
+}
+
+TEST(BPlusTreeTests, SampleTest) {
+  // Init engine
+  DBStorageEngine engine(db_name);
+  BasicComparator<int> comparator;
+  BPlusTree<int, int, BasicComparator<int>> tree(0, engine.bpm_, comparator, 4, 4);
+  TreeFileManagers mgr("tree_");
+  // Prepare data
+  const int n = 500;
   vector<int> keys;
   vector<int> values;
   vector<int> delete_seq;
@@ -78,6 +114,7 @@ TEST(BPlusTreeTests, DISABLED_SampleTest) {
   // Insert data
   for (int i = 0; i < n; i++) {
     tree.Insert(keys[i], values[i]);
+    tree.PrintTree(mgr[i]);
   }
   ASSERT_TRUE(tree.Check());
   // Print tree
@@ -92,6 +129,7 @@ TEST(BPlusTreeTests, DISABLED_SampleTest) {
   // Delete half keys
   for (int i = 0; i < n / 2; i++) {
     tree.Remove(delete_seq[i]);
+    tree.PrintTree(mgr[i]);
   }
   tree.PrintTree(mgr[1]);
   // Check valid
