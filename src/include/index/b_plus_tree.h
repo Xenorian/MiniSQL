@@ -99,6 +99,8 @@ private:
 
   void UpdateRootPageId(int insert_record = 0);
 
+  void EditRoot(page_id_t new_page_id);
+
   /* Debug Routines for FREE!! */
   void ToGraph(BPlusTreePage *page, BufferPoolManager *bpm, std::ofstream &out) const;
 
