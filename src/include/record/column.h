@@ -1,14 +1,17 @@
 #ifndef MINISQL_COLUMN_H
 #define MINISQL_COLUMN_H
 
-#include<iostream>
-
 #include <string>
 
 #include "common/macros.h"
 #include "record/types.h"
-#include "glog/logging.h"
 
+/*
+* data format:
+* uint32_t magic, string_leng
+* char*n name
+* uint32_t type, length, index, nullable, unique
+*/
 class Column {
   friend class Schema;
 
