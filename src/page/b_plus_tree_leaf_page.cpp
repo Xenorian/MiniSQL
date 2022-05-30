@@ -105,7 +105,7 @@ INDEX_TEMPLATE_ARGUMENTS
 int B_PLUS_TREE_LEAF_PAGE_TYPE::Insert(const KeyType &key, const ValueType &value, const KeyComparator &comparator) {
   if (GetSize() == 0) {
   } else {
-    ASSERT(comparator(array_[my_lower_bound(key, comparator)-1].first, key) != 0, "Already exists");
+    ASSERT(my_lower_bound(key, comparator)==0||comparator(array_[my_lower_bound(key, comparator)-1].first, key) != 0, "Already exists");
   }
 
   int place = my_lower_bound(key, comparator);

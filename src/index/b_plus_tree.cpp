@@ -30,15 +30,17 @@ INDEX_TEMPLATE_ARGUMENTS
 void BPLUSTREE_TYPE::Destroy_subtree(page_id_t root) {
   if (root == INVALID_PAGE_ID) return;
 
-  BPlusTreePage *root_page = reinterpret_cast<BPlusTreePage *>(buffer_pool_manager_->FetchPage(root_page_id_));
+  BPlusTreePage *root_page = reinterpret_cast<BPlusTreePage *>(buffer_pool_manager_->FetchPage(root)->GetData());
   if (root_page->IsLeafPage() == true) {
     buffer_pool_manager_->UnpinPage(root, false);
     buffer_pool_manager_->DeletePage(root);
   } else {
     InternalPage *this_page = reinterpret_cast<InternalPage *> (root_page);
     int start=0;
-    int end = this_page->GetSize();
-    for (int i = start; i <= end; i++) Destroy_subtree(this_page->ValueAt(i));
+    int end = this_page->GetSize()-1;
+    for (int i = start; i <= end; i++) {
+      Destroy_subtree(this_page->ValueAt(i));
+    }
     buffer_pool_manager_->UnpinPage(root, false);
     buffer_pool_manager_->DeletePage(root);
   }
@@ -212,7 +214,7 @@ bool BPLUSTREE_TYPE::InsertIntoLeaf(const KeyType &key, const ValueType &value, 
 
       //2. check the split
       if (leaf_page->GetSize() <= leaf_page->GetMaxSize()) {
-        
+        buffer_pool_manager_->UnpinPage(leaf_page->GetPageId(), false);
       } else {
         new_page = Split(leaf_page);
         //no parent
@@ -231,7 +233,7 @@ bool BPLUSTREE_TYPE::InsertIntoLeaf(const KeyType &key, const ValueType &value, 
         //have parent
         else {
           InsertIntoParent(leaf_page, new_page->KeyAt(0), new_page, transaction);
-          Insert(key, value, transaction);
+          //Insert(key, value, transaction);
           buffer_pool_manager_->UnpinPage(leaf_page->GetPageId(), true);
           buffer_pool_manager_->UnpinPage(new_page->GetPageId(), true);
         }

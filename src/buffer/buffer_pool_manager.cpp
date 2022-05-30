@@ -69,6 +69,7 @@ Page *BufferPoolManager::NewPage(page_id_t &page_id) {
     free_list_.pop_front();
   } else {
     replacer_->Victim(&new_frame_id);
+    if (pages_[new_frame_id].IsDirty() == 1) disk_manager_->WritePage(new_frame_id, pages_[new_frame_id].data_);
     page_table_.erase(page_table_.find(pages_[new_frame_id].page_id_));
   }
   
@@ -98,9 +99,9 @@ bool BufferPoolManager::DeletePage(page_id_t page_id) {
     return false;
   }
   // 3.   Otherwise, P can be deleted. Remove P from the page table, reset its metadata and return it to the free list.
-  page_table_.erase(page_id);
   pages_[the_frame->second].ResetMemory();
   free_list_.push_back(the_frame->second);
+  page_table_.erase(page_id);
   return true;
 }
 
