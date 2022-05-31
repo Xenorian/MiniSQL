@@ -55,15 +55,18 @@ uint32_t Row::DeserializeFrom(char *buf, Schema *schema) {
     tmp += sizeof(bool);
   }
   // fields
+  for (i = fields_.size(); i < schema->GetColumnCount();i++) {
+    fields_.push_back(nullptr);
+  }
+
   for (i = 0; i < schema->GetColumnCount(); i++) {
     if (null_map[i] == false) {
-      fields_.push_back(nullptr);
       fields_[i]->DeserializeFrom(tmp, schema->GetColumn(i)->GetType(), &(fields_[i]), false, heap_);
       tmp += fields_[i]->GetSerializedSize();
     } else {
       void *mem = heap_->Allocate(sizeof(Field));
       new (mem) Field(schema->GetColumn(i)->GetType());
-      fields_.push_back((Field *)mem);
+      fields_[i] = (Field *)mem;
     }
   }
 

@@ -51,12 +51,13 @@ public:
   INDEXITERATOR_TYPE End();
 
   // expose for test purpose
-  Page *FindLeafPage(const KeyType &key, bool leftMost = false);
+  LeafPage *FindLeafPage(const KeyType &key);
 
   // used to check whether all pages are unpinned
   bool Check();
 
   // destroy the b plus tree
+  void Destroy_subtree(page_id_t root);
   void Destroy();
 
   void PrintTree(std::ofstream &out) {
@@ -69,6 +70,8 @@ public:
     ToGraph(node, buffer_pool_manager_, out);
     out << "}" << std::endl;
   }
+
+  //bool my_less_than(KeyType &a, KeyType &b) { return comparator_(a, b) < 0;}
 
 private:
   void StartNewTree(const KeyType &key, const ValueType &value);
@@ -85,15 +88,18 @@ private:
   bool CoalesceOrRedistribute(N *node, Transaction *transaction = nullptr);
 
   template<typename N>
-  bool Coalesce(N **neighbor_node, N **node, BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator> **parent,
+  bool Coalesce(N *neighbor_node, N *node, BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator> *parent, int max_index,
                 int index, Transaction *transaction = nullptr);
 
   template<typename N>
-  void Redistribute(N *neighbor_node, N *node, int index);
+  void Redistribute(N *neighbor_node, N *node, BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator> *parent,
+                    int max_index, int index);
 
   bool AdjustRoot(BPlusTreePage *node);
 
   void UpdateRootPageId(int insert_record = 0);
+
+  void EditRoot(page_id_t new_page_id);
 
   /* Debug Routines for FREE!! */
   void ToGraph(BPlusTreePage *page, BufferPoolManager *bpm, std::ofstream &out) const;

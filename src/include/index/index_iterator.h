@@ -9,7 +9,12 @@ INDEX_TEMPLATE_ARGUMENTS
 class IndexIterator {
 public:
   // you may define your own constructor based on your member variables
-  explicit IndexIterator();
+ explicit IndexIterator(page_id_t first_page_id,int index, BufferPoolManager *bpm);
+ explicit IndexIterator(bool in_valid) {
+   valid = in_valid;
+   leaf_page = nullptr;
+   index_now = 0;
+ }
 
   ~IndexIterator();
 
@@ -27,6 +32,10 @@ public:
 
 private:
   // add your own private member variables here
+ BPlusTreeLeafPage<KeyType,ValueType,KeyComparator>* leaf_page;
+ BufferPoolManager *my_buffer_pool_mangaer;
+ int index_now;
+ bool valid;
 };
 
 

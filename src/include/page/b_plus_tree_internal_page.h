@@ -36,23 +36,30 @@ public:
 
   ValueType Lookup(const KeyType &key, const KeyComparator &comparator) const;
 
-  void PopulateNewRoot(const ValueType &old_value, const KeyType &new_key, const ValueType &new_value);
+  int my_lower_bound(const KeyType &key,const KeyComparator &comp) const;
+
+  int KeyIndex(const KeyType &key, const KeyComparator &comparator) const;
+
+  void PopulateNewRoot(const KeyType &old_key, const ValueType &old_value, const KeyType &new_key,
+                       const ValueType &new_value);
 
   int InsertNodeAfter(const ValueType &old_value, const KeyType &new_key, const ValueType &new_value);
+
+  int EditNode(const ValueType &old_value, const KeyType &new_key);
 
   void Remove(int index);
 
   ValueType RemoveAndReturnOnlyChild();
 
   // Split and Merge utility methods
-  void MoveAllTo(BPlusTreeInternalPage *recipient, const KeyType &middle_key, BufferPoolManager *buffer_pool_manager);
+  void MoveAllTo(BPlusTreeInternalPage *recipient, BufferPoolManager *buffer_pool_manager);
 
   void MoveHalfTo(BPlusTreeInternalPage *recipient, BufferPoolManager *buffer_pool_manager);
 
-  void MoveFirstToEndOf(BPlusTreeInternalPage *recipient, const KeyType &middle_key,
+  void MoveFirstToEndOf(BPlusTreeInternalPage *recipient, 
                         BufferPoolManager *buffer_pool_manager);
 
-  void MoveLastToFrontOf(BPlusTreeInternalPage *recipient, const KeyType &middle_key,
+  void MoveLastToFrontOf(BPlusTreeInternalPage *recipient,
                          BufferPoolManager *buffer_pool_manager);
 
 private:
@@ -62,7 +69,7 @@ private:
 
   void CopyFirstFrom(const MappingType &pair, BufferPoolManager *buffer_pool_manager);
 
-  MappingType array_[0];
+  MappingType array_[INTERNAL_PAGE_SIZE];
 };
 
 #endif  // MINISQL_B_PLUS_TREE_INTERNAL_PAGE_H

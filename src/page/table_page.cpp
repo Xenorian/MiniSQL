@@ -61,7 +61,7 @@ bool TablePage::MarkDelete(const RowId &rid, Transaction *txn, LockManager *lock
   return true;
 }
 
-int TablePage::UpdateTuple(const Row &new_row, Row *old_row, Schema *schema,
+bool TablePage::UpdateTuple(const Row &new_row, Row *old_row, Schema *schema,
                             Transaction *txn, LockManager *lock_manager, LogManager *log_manager) {
   ASSERT(old_row != nullptr && old_row->GetRowId().Get() != INVALID_ROWID.Get(), "invalid old row.");
   uint32_t serialized_size = new_row.GetSerializedSize(schema);
@@ -69,16 +69,16 @@ int TablePage::UpdateTuple(const Row &new_row, Row *old_row, Schema *schema,
   uint32_t slot_num = old_row->GetRowId().GetSlotNum();
   // If the slot number is invalid, abort.
   if (slot_num >= GetTupleCount()) {
-    return -1;
+    return false;
   }
   uint32_t tuple_size = GetTupleSize(slot_num);
   // If the tuple is deleted, abort.
   if (IsDeleted(tuple_size)) {
-    return -1;
+    return false;
   }
   // If there is not enough space to update, we need to update via delete followed by an insert (not enough space).
   if (GetFreeSpaceRemaining() + tuple_size < serialized_size) {
-    return 0;
+    return false;
   }
   // Copy out the old value.
   uint32_t tuple_offset = GetTupleOffsetAtSlot(slot_num);
@@ -99,7 +99,7 @@ int TablePage::UpdateTuple(const Row &new_row, Row *old_row, Schema *schema,
       SetTupleOffsetAtSlot(i, tuple_offset_i + tuple_size - new_row.GetSerializedSize(schema));
     }
   }
-  return 1;
+  return true;
 }
 
 void TablePage::ApplyDelete(const RowId &rid, Transaction *txn, LogManager *log_manager) {

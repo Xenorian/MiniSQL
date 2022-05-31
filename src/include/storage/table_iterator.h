@@ -14,16 +14,21 @@ class TableHeap;
 class TableIterator {
 
 public:
-  explicit TableIterator(BufferPoolManager *buffer_pool_manager, Schema *schema, LogManager *log_manager,
-LockManager *lock_manager, RowId row_record);
+  // you may define your own constructor based on your member variables
+ explicit TableIterator(RowId record_id_first, BufferPoolManager *buffer_pool_manager, Schema *schema,
+                        LogManager *log_manager, LockManager *lock_manager);
 
   explicit TableIterator(const TableIterator &other);
 
   virtual ~TableIterator();
 
-  inline bool operator==(const TableIterator &itr) const;
+  inline bool operator==(const TableIterator &itr) const { return (this->record_now_.GetRowId() == itr.record_now_.GetRowId()); };
 
-  inline bool operator!=(const TableIterator &itr) const;
+  inline bool operator!=(const TableIterator &itr) const {
+    return (this->record_now_.GetRowId().Get() != itr.record_now_.GetRowId().Get());
+  };
+
+  TableIterator &operator=(const TableIterator &other);
 
   const Row &operator*();
 
@@ -35,13 +40,13 @@ LockManager *lock_manager, RowId row_record);
 
 private:
   // add your own private member variables here
-  BufferPoolManager *buffer_pool_manager_;
-  Schema *schema_;
-  LogManager *log_manager_;
-  LockManager *lock_manager_;
-  Transaction *txn_;
-  RowId row_record_; //
-  Row tuple; // the current tuple
+ BufferPoolManager *buffer_pool_manager_;
+ Schema *schema_;
+ LogManager *log_manager_;
+ LockManager *lock_manager_;
+ Transaction *txn;
+ //RowId record_id_now_;
+ Row record_now_;
 };
 
 #endif //MINISQL_TABLE_ITERATOR_H

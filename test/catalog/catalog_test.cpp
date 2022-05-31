@@ -59,6 +59,7 @@ TEST(CatalogTest, CatalogTableTest) {
   auto *table_heap = table_info->GetTableHeap();
   ASSERT_TRUE(table_heap != nullptr);
   delete db_01;
+  cout<<"get table success"<<endl;
   /** Stage 2: Testing catalog loading */
   auto db_02 = new DBStorageEngine(db_file_name, false);
   auto &catalog_02 = db_02->catalog_mgr_;

@@ -96,17 +96,16 @@ private:
   /**
    * create table heap and initialize first page
    */
-  explicit TableHeap(BufferPoolManager *buffer_pool_manager, Schema *schema, Transaction *txn,
-                     LogManager *log_manager, LockManager *lock_manager) :
-          buffer_pool_manager_(buffer_pool_manager),
-          schema_(schema),
-          log_manager_(log_manager),
-          lock_manager_(lock_manager) {
-    TablePage *first_page = (TablePage*)buffer_pool_manager->NewPage(first_page_id_);
-    first_page->Init(first_page_id_, INVALID_PAGE_ID, log_manager_, txn);
-    first_page->SetNextPageId(INVALID_PAGE_ID);
-    buffer_pool_manager_->UnpinPage(first_page->GetTablePageId(), false);
-  };
+ explicit TableHeap(BufferPoolManager *buffer_pool_manager, Schema *schema, Transaction *txn, LogManager *log_manager,
+                    LockManager *lock_manager)
+     : buffer_pool_manager_(buffer_pool_manager),
+       schema_(schema),
+       log_manager_(log_manager),
+       lock_manager_(lock_manager) {
+   TablePage *first_page = (TablePage*)buffer_pool_manager->NewPage(first_page_id_);
+   first_page->Init(first_page_id_, INVALID_PAGE_ID, log_manager_, txn);
+   first_page->SetNextPageId(INVALID_PAGE_ID);
+ };
 
   /**
    * load existing table heap by first_page_id
@@ -118,13 +117,18 @@ private:
             schema_(schema),
             log_manager_(log_manager),
             lock_manager_(lock_manager) {}
+ /* 
+ * create new page for the tableheap
+ */
+  page_id_t AllocateNewTablePage(page_id_t last_page_id, BufferPoolManager *buffer_pool_manager, Transaction *txn,
+                            LockManager *lock_manager, LogManager *log_manager);
 
-private:
+ private:
   BufferPoolManager *buffer_pool_manager_;
   page_id_t first_page_id_;
   Schema *schema_;
-  LogManager *log_manager_;
-  LockManager *lock_manager_;
+  [[maybe_unused]] LogManager *log_manager_;
+  [[maybe_unused]] LockManager *lock_manager_;
 };
 
 #endif  // MINISQL_TABLE_HEAP_H
