@@ -64,11 +64,11 @@ int main(int argc, char **argv) {
       // error
       printf("%s\n", MinisqlParserGetErrorMessage());
     } else {
-#ifdef ENABLE_PARSER_DEBUG
+//#ifdef ENABLE_PARSER_DEBUG
       printf("[INFO] Sql syntax parse ok!\n");
       SyntaxTreePrinter printer(MinisqlGetParserRootNode());
       printer.PrintTree(syntax_tree_file_mgr[syntax_tree_id++]);
-#endif
+//#endif
     }
 
     ExecuteContext context;
