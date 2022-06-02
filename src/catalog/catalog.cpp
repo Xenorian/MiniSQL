@@ -89,6 +89,8 @@ CatalogManager::CatalogManager(BufferPoolManager *buffer_pool_manager, LockManag
     next_table_id_ = 0;
     next_index_id_ = 0;
     catalog_meta_ = CatalogMeta::NewInstance(heap_);
+    catalog_meta_->SerializeTo((buffer_pool_manager_->FetchPage(CATALOG_META_PAGE_ID))->GetData());
+    buffer_pool_manager_->UnpinPage(CATALOG_META_PAGE_ID, true);
   }
   else{
     Page* p = buffer_pool_manager->FetchPage(CATALOG_META_PAGE_ID);

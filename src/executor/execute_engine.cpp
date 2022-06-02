@@ -115,6 +115,7 @@ dberr_t ExecuteEngine::ExecuteUseDatabase(pSyntaxNode ast, ExecuteContext *conte
       //该database已经存在
       test_file.close();
       dbs_[database_name] = new DBStorageEngine(database_name, false);
+      current_db_ = database_name;
       return DB_SUCCESS;
     } else {
       //not exist
