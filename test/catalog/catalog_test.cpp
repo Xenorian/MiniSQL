@@ -58,6 +58,7 @@ TEST(CatalogTest, CatalogTableTest) {
   ASSERT_EQ(table_info, table_info_02);
   auto *table_heap = table_info->GetTableHeap();
   ASSERT_TRUE(table_heap != nullptr);
+  db_01->bpm_->FetchPage(2);
   delete db_01;
   cout<<"get table success"<<endl;
   /** Stage 2: Testing catalog loading */

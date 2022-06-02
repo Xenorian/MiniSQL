@@ -25,9 +25,9 @@ public:
 
   ~DiskManager() {
     if (!closed) {
-      Close();
       // write the disk-file metadate to disk
       WritePhysicalPage(0, meta_data_);
+      Close();
     }
   }
 

@@ -10,6 +10,7 @@ BufferPoolManager::BufferPoolManager(size_t pool_size, DiskManager *disk_manager
   for (size_t i = 0; i < pool_size_; i++) {
     free_list_.emplace_back(i);
   }
+
 }
 
 BufferPoolManager::~BufferPoolManager() {
@@ -41,7 +42,9 @@ Page *BufferPoolManager::FetchPage(page_id_t page_id) {
   // 2.     If R is dirty, write it back to the disk.
   if (pages_[new_frame_id].IsDirty() == 1) disk_manager_->WritePage(new_frame_id, pages_[new_frame_id].data_);
   // 3.     Delete R from the page table and insert P.
-  page_table_.erase(page_table_.find(pages_[new_frame_id].page_id_));
+  if (page_table_.find(pages_[new_frame_id].page_id_)!=page_table_.end())
+    page_table_.erase(page_table_.find(pages_[new_frame_id].page_id_));
+
   page_table_.insert(make_pair(page_id, new_frame_id));
   // 4.     Update P's metadata, read in the page content from disk, and then return a pointer to P.
   pages_[new_frame_id].is_dirty_ = 0;
@@ -112,7 +115,7 @@ bool BufferPoolManager::UnpinPage(page_id_t page_id, bool is_dirty) {
   return true;
 }
 bool BufferPoolManager::FlushPage(page_id_t page_id) {
-  if (pages_[(*page_table_.find(page_id)).second].IsDirty() != 0) {
+  if (pages_[(*page_table_.find(page_id)).second].IsDirty() == true) {
     disk_manager_->WritePage(page_id, pages_[(*page_table_.find(page_id)).second].data_);
   }
   return true;

@@ -22,9 +22,6 @@ uint32_t IndexMetadata::SerializeTo(char *buf) const {
   MACH_WRITE_STRING(buf + ofs, index_name_);
   ofs = ofs + index_name_.length();
 
-  MACH_WRITE_UINT32(buf + ofs, index_id_);
-  ofs = ofs + 4;
-
   MACH_WRITE_UINT32(buf + ofs, table_id_);
   ofs = ofs + 4;
 

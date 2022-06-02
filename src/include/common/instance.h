@@ -21,6 +21,7 @@ public:
     }
     // Initialize components
     disk_mgr_ = new DiskManager(db_file_name_);
+
     bpm_ = new BufferPoolManager(buffer_pool_size, disk_mgr_);
     catalog_mgr_ = new CatalogManager(bpm_, nullptr, nullptr, init);
     // Allocate static page for db storage engine
@@ -30,6 +31,8 @@ public:
       ASSERT(bpm_->IsPageFree(INDEX_ROOTS_PAGE_ID), "Header page not free.");
       ASSERT(bpm_->NewPage(id) != nullptr && id == CATALOG_META_PAGE_ID, "Failed to allocate catalog meta page.");
       ASSERT(bpm_->NewPage(id) != nullptr && id == INDEX_ROOTS_PAGE_ID, "Failed to allocate header page.");
+      ASSERT(!bpm_->IsPageFree(CATALOG_META_PAGE_ID), "Invalid catalog meta page.");
+      ASSERT(!bpm_->IsPageFree(INDEX_ROOTS_PAGE_ID), "Invalid header page.");
       bpm_->UnpinPage(CATALOG_META_PAGE_ID, false);
       bpm_->UnpinPage(INDEX_ROOTS_PAGE_ID, false);
     } else {

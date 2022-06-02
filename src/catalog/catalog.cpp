@@ -26,6 +26,7 @@ void CatalogMeta::SerializeTo(char *buf) const {
     MACH_WRITE_INT32(buf + ofs, iter->second);
     ofs = ofs + 4;
   }
+
 }
 
 CatalogMeta *CatalogMeta::DeserializeFrom(char *buf, MemHeap *heap) {
@@ -100,26 +101,31 @@ CatalogManager::CatalogManager(BufferPoolManager *buffer_pool_manager, LockManag
     
     for(auto it:catalog_meta_->table_meta_pages_){
       if(it.second<0) continue;
-      TableMetadata* meta;
+      TableMetadata* meta=nullptr;
       meta->DeserializeFrom(buffer_pool_manager->FetchPage(it.second)->GetData(), meta, heap_);
-      TableInfo* tinfo;
+      TableInfo* tinfo=nullptr;
       tinfo = TableInfo::Create(heap_);
       TableHeap *table_heap = TableHeap::Create(buffer_pool_manager_,meta->GetSchema(), nullptr, log_manager_, lock_manager_, heap_);
       tinfo->Init(meta, table_heap);
       table_names_[meta->GetTableName()] = meta->GetTableId();
       tables_[meta->GetTableId()] = tinfo;
       index_names_.insert({meta->GetTableName(), std::unordered_map<std::string, index_id_t>()});
+      buffer_pool_manager->UnpinPage(it.second,false);
     }
+
     for(auto it:catalog_meta_->index_meta_pages_){
       if(it.second<0) continue;
-      IndexMetadata* meta;
+      IndexMetadata *meta = nullptr;
       IndexMetadata::DeserializeFrom(buffer_pool_manager->FetchPage(it.second)->GetData(), meta, heap_);
       TableInfo* tinfo = tables_[meta->GetTableId()];
       IndexInfo* index_info = IndexInfo::Create(heap_);
       index_info->Init(meta,tinfo,buffer_pool_manager_);//segmentation
       index_names_[tinfo->GetTableName()][meta->GetIndexName()] = meta->GetIndexId();
       indexes_[meta->GetIndexId()] = index_info;
+      buffer_pool_manager->UnpinPage(it.second, false);
     }
+
+    buffer_pool_manager->UnpinPage(CATALOG_META_PAGE_ID, false);
   }
 }
 
@@ -153,6 +159,10 @@ dberr_t CatalogManager::CreateTable(const string &table_name, TableSchema *schem
 
   table_names_[table_name] = next_table_id_++; //update table_names_ & next_table_id_
   index_names_.insert({table_name, std::unordered_map<std::string, index_id_t>()});
+
+  buffer_pool_manager_->UnpinPage(CATALOG_META_PAGE_ID, true);
+  buffer_pool_manager_->UnpinPage(page_id, true);
+
   if(table_meta != nullptr && table_heap != nullptr) return DB_SUCCESS;
   return DB_FAILED;
 
@@ -243,6 +253,10 @@ dberr_t CatalogManager::CreateIndex(const std::string &table_name, const string 
   cout<<"CreatIndex Success, <tid, pid> = "<<next_index_id_<<", "<<page_id<<endl;
   indexes_[next_index_id_] = index_info; //update indexes_
   index_names_[table_name][index_name] = next_index_id_++; //update index_names_ & next_index_id_
+
+  buffer_pool_manager_->UnpinPage(CATALOG_META_PAGE_ID, true);
+  buffer_pool_manager_->UnpinPage(page_id, true);
+
   return DB_SUCCESS;
 }
 
@@ -289,6 +303,7 @@ dberr_t CatalogManager::DropTable(const string &table_name) {
     for(auto i: index->second){ //delete indexes_
       index_id_t index_id = i.second;
       indexes_.erase(index_id);
+       //delete the data
     }
     table_names_.erase(table_name); //delete table_names_
     index_names_.erase(table_name); //delete index_names_
@@ -308,6 +323,8 @@ dberr_t CatalogManager::DropIndex(const string &table_name, const string &index_
       return DB_INDEX_NOT_FOUND;
     }
     auto index_id = tmp_index_id->second;
+
+
     indexes_.erase(index_id);
     tmp_index_table.erase(index_name);
     return DB_SUCCESS;
@@ -336,6 +353,8 @@ dberr_t CatalogManager::LoadTable(const table_id_t table_id, const page_id_t pag
   tables_[table_id] = table_info;
   table_names_[table_info->GetTableName()] = table_info->GetTableId();
   /* thus table_meta and table_heap are created by table_info */
+
+  buffer_pool_manager_->UnpinPage(page_id, false);
   return DB_SUCCESS;
 }
 
@@ -353,6 +372,8 @@ dberr_t CatalogManager::LoadIndex(const index_id_t index_id, const page_id_t pag
   std::unordered_map<std::string, index_id_t> temp;
   temp[index_info->GetIndexName()] = index_id;
   index_names_[index_info->GetTableInfo()->GetTableName()] = temp;
+
+  buffer_pool_manager_->UnpinPage(page_id, false);
   return DB_SUCCESS;
 }
 
