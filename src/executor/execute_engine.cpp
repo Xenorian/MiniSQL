@@ -2,6 +2,18 @@
 #include "glog/logging.h"
 #include <string>
 
+#include <cstdio>
+#include "parser/syntax_tree_printer.h"
+#include "utils/tree_file_mgr.h"
+
+#define ENABLE_PARSER_DEBUG
+
+extern "C" {
+int yyparse(void);
+#include "parser/minisql_lex.h"
+#include "parser/parser.h"
+}
+
 ExecuteEngine::ExecuteEngine() {}
 
 dberr_t ExecuteEngine::Execute(pSyntaxNode ast, ExecuteContext *context) {
@@ -709,10 +721,50 @@ dberr_t ExecuteEngine::ExecuteTrxRollback(pSyntaxNode ast, ExecuteContext *conte
 }
 
 dberr_t ExecuteEngine::ExecuteExecfile(pSyntaxNode ast, ExecuteContext *context) {
-#ifdef ENABLE_EXECUTE_DEBUG
-  LOG(INFO) << "ExecuteExecfile" << std::endl;
-#endif
-  return DB_FAILED;
+  /*#ifdef ENABLE_EXECUTE_DEBUG
+  LOG(INFO) << "ExecuteInsert" << std::endl;
+  #endif
+  return DB_FAILED;*/
+  std::string txt_name = ast->child_->val_;
+  ifstream test_file;
+  test_file.open(txt_name, ios::in);
+  //该文件存在
+  if (test_file.good()) {
+    test_file.close();
+    FILE *txt = fopen(txt_name.c_str(), "r");
+    char code[1024];
+    while (!feof(txt)) {
+      fscanf(txt, "%[^;]%*c", code);
+      strcat(code, ";");
+      YY_BUFFER_STATE bp = yy_scan_string(code);
+      if (bp == nullptr) {
+        LOG(ERROR) << "Failed to create yy buffer state." << std::endl;
+        exit(-1);
+      }
+      yy_switch_to_buffer(bp);
+      MinisqlParserInit();
+      yyparse();
+      if (MinisqlParserGetError()) {
+        printf("%s\n", MinisqlParserGetErrorMessage());
+      }
+      Execute(MinisqlGetParserRootNode(), context);
+      sleep(1);
+      MinisqlParserFinish();
+      yy_delete_buffer(bp);
+      yylex_destroy();
+      if (context->flag_quit_) {
+        printf("bye!\n");
+        break;
+      }
+    }
+    fclose(txt);
+    return DB_SUCCESS;
+  } 
+  //该文件不存在
+  else {
+    cout << "The file is not exist!" << endl;
+    return DB_SUCCESS;
+  }
 }
 
 dberr_t ExecuteEngine::ExecuteQuit(pSyntaxNode ast, ExecuteContext *context) {
