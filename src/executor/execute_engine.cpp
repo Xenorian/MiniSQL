@@ -1,6 +1,6 @@
 #include "executor/execute_engine.h"
-#include "glog/logging.h"
 #include <string>
+#include "glog/logging.h"
 
 ExecuteEngine::ExecuteEngine() {}
 
@@ -59,16 +59,17 @@ dberr_t ExecuteEngine::ExecuteCreateDatabase(pSyntaxNode ast, ExecuteContext *co
   #endif
   return DB_FAILED;*/
   std::string database_name = ast->child_->val_;
-
-  //exist or not
+  //判断是否存在该database文件
   ifstream test_file;
   test_file.open(database_name, ios::in);
-
+  //已存在该文件，但未写入内存
   if (test_file.good()) {
-    //该database已经存在
     test_file.close();
+    std::cout << "This database has been created already!" << std::endl;
     return DB_FAILED;
-  } else {
+  }
+  //不存在该文件
+  else {
     dbs_[database_name] = new DBStorageEngine(database_name, true);
     return DB_SUCCESS;
   }
@@ -80,60 +81,113 @@ dberr_t ExecuteEngine::ExecuteDropDatabase(pSyntaxNode ast, ExecuteContext *cont
   #endif
   return DB_FAILED;*/
   std::string database_name = ast->child_->val_;
-  if (dbs_.find(database_name) == dbs_.end()) {
-    //该database不存在
-    return DB_FAILED;
-  } else {
-    auto iter = dbs_.find(database_name);
-    dbs_.erase(iter);
+  //判断是否存在该database文件
+  ifstream test_file;
+  test_file.open(database_name, ios::in);
+  //已存在该文件
+  if (test_file.good()) {
+    test_file.close();
+    if (remove(database_name.c_str()) != 0) {
+      std::cout << "Delete failed..." << std::endl;
+      return DB_FAILED;
+    }
+    if (dbs_.find(database_name) != dbs_.end()) {
+      auto iter = dbs_.find(database_name);
+      dbs_.erase(iter);
+    } 
+    if (database_name == current_db_) {
+      current_db_ = "";
+    }
     return DB_SUCCESS;
+  }
+  //不存在该文件
+  else {
+    std::cout << "The database is not exist!" << std::endl;
+    return DB_FAILED;
   }
 }
 
 dberr_t ExecuteEngine::ExecuteShowDatabases(pSyntaxNode ast, ExecuteContext *context) {
-#ifdef ENABLE_EXECUTE_DEBUG
-  LOG(INFO) << "ExecuteShowDatabases" << std::endl;
-#endif
-  return DB_FAILED;
-  //不知道show到哪里去
+  /*#ifdef ENABLE_EXECUTE_DEBUG
+    LOG(INFO) << "ExecuteDropIndex" << std::endl;
+    #endif
+    return DB_FAILED;*/
+  ofstream outfile;
+  outfile.open("show_databases.txt", ostream::out);
+  for (auto iter = dbs_.begin(); iter != dbs_.end(); iter++) {
+    outfile << iter->first << endl;
+  }
+  outfile.close();
+  return DB_SUCCESS;
 }
 
 dberr_t ExecuteEngine::ExecuteUseDatabase(pSyntaxNode ast, ExecuteContext *context) {
   /*#ifdef ENABLE_EXECUTE_DEBUG
   LOG(INFO) << "ExecuteDropIndex" << std::endl;
   #endif
-  return DB_FAILED;*/ 
+  return DB_FAILED;*/
   std::string database_name = ast->child_->val_;
-
+  //查找该database文件
   auto iter = dbs_.find(database_name);
   if (iter == dbs_.end()) {
-    //test
     ifstream test_file;
     test_file.open(database_name, ios::in);
-
+    //该database已经存在
     if (test_file.good()) {
-      //该database已经存在
       test_file.close();
       dbs_[database_name] = new DBStorageEngine(database_name, false);
       current_db_ = database_name;
       return DB_SUCCESS;
-    } else {
-      //not exist
+    }
+    //不存在该database
+    else {
       return DB_FAILED;
     }
-  } else {
-    //already opened
+  }
+  // database已经在内存中
+  else {
     current_db_ = iter->first;
     return DB_SUCCESS;
   }
 }
 
 dberr_t ExecuteEngine::ExecuteShowTables(pSyntaxNode ast, ExecuteContext *context) {
-#ifdef ENABLE_EXECUTE_DEBUG
-  LOG(INFO) << "ExecuteShowTables" << std::endl;
-#endif
-  return DB_FAILED;
-  //不知道show到哪里去
+  /*#ifdef ENABLE_EXECUTE_DEBUG
+    LOG(INFO) << "ExecuteDropIndex" << std::endl;
+    #endif
+    return DB_FAILED;*/
+  if (current_db_ == "") {
+    //未选择database
+    return DB_FAILED;
+  }
+  DBStorageEngine *databese_now = dbs_[current_db_];
+  vector<TableInfo *> my_tables;
+  if (databese_now->catalog_mgr_->GetTables(my_tables) == DB_FAILED) {
+    //无法获取table
+    return DB_FAILED;
+  }
+  ofstream outfile;
+  outfile.open("show_tables.txt", ostream::out);
+  for (uint32_t i = 0; i < my_tables.size(); i++) {
+    outfile << my_tables[i]->GetTableId() << " " << my_tables[i]->GetTableName() << endl;
+    Schema *my_schema = my_tables[i]->GetSchema();
+    vector<Column *> my_columns = my_schema->GetColumns();
+    for (uint32_t j = 0; j < my_columns.size(); j++) {
+      outfile << my_columns[j]->GetName() << "(";
+      if (my_columns[j]->GetType() == kTypeChar) {
+        outfile << "char" << " " << my_columns[j]->GetLength() << ") ";
+      } 
+      else if (my_columns[j]->GetType() == kTypeInt) {
+        outfile << "int) ";
+      }
+      else {
+        outfile << "float) ";
+      }
+    }
+    outfile << endl;
+  }
+  outfile.close();
+  return DB_SUCCESS;
 }
 
 dberr_t ExecuteEngine::ExecuteCreateTable(pSyntaxNode ast, ExecuteContext *context) {
@@ -148,10 +202,10 @@ dberr_t ExecuteEngine::ExecuteCreateTable(pSyntaxNode ast, ExecuteContext *conte
   DBStorageEngine *databese_now = dbs_[current_db_];
   std::string table_name = ast->child_->val_;
   TableInfo *my_tableinfo = nullptr;
-  /*if (databese_now->catalog_mgr_->GetTable(table_name, my_tableinfo) == DB_SUCCESS) {
+  if (databese_now->catalog_mgr_->GetTable(table_name, my_tableinfo) == DB_SUCCESS) {
     //该table已存在
     return DB_FAILED;
-  }*/
+  }
   pSyntaxNode definition = ast->child_->next_->child_;
   vector<Column *> column_definition;
   vector<std::string> primary_keys;
@@ -197,19 +251,19 @@ dberr_t ExecuteEngine::ExecuteCreateTable(pSyntaxNode ast, ExecuteContext *conte
         type = kTypeInvalid;
       }
       if (type == kTypeChar) {
-        Column tmp(column_name, type, length, index, nullable, unique);
-        column_definition.push_back(&tmp);
+        Column *tmp = new Column(column_name, type, length, index, nullable, unique);
+        column_definition.push_back(tmp);
       } else {
-        Column tmp(column_name, type, index, nullable, unique);
-        column_definition.push_back(&tmp);
+        Column *tmp = new Column(column_name, type, index, nullable, unique);
+        column_definition.push_back(tmp);
       }
     }
     definition = definition->next_;
     index++;
   }
-  TableSchema my_schema(column_definition);
+  TableSchema *my_schema = new TableSchema(column_definition);
   // 主键现在还不能传
-  return databese_now->catalog_mgr_->CreateTable(table_name, &my_schema, nullptr, my_tableinfo);
+  return databese_now->catalog_mgr_->CreateTable(table_name, my_schema, nullptr, my_tableinfo);
 }
 
 dberr_t ExecuteEngine::ExecuteDropTable(pSyntaxNode ast, ExecuteContext *context) {
@@ -227,11 +281,26 @@ dberr_t ExecuteEngine::ExecuteDropTable(pSyntaxNode ast, ExecuteContext *context
 }
 
 dberr_t ExecuteEngine::ExecuteShowIndexes(pSyntaxNode ast, ExecuteContext *context) {
-#ifdef ENABLE_EXECUTE_DEBUG
-  LOG(INFO) << "ExecuteShowIndexes" << std::endl;
-#endif
+  /*#ifdef ENABLE_EXECUTE_DEBUG
+    LOG(INFO) << "ExecuteDropIndex" << std::endl;
+    #endif
+    return DB_FAILED;*/
+  if (current_db_ == "") {
+    //未选择database
+    return DB_FAILED;
+  }
+  DBStorageEngine *databese_now = dbs_[current_db_];
+  vector<TableInfo *> my_tables;
+  if (databese_now->catalog_mgr_->GetTables(my_tables) == DB_FAILED) {
+    //无法获取table
+    return DB_FAILED;
+  }
+  for (uint32_t i = 0; i < my_tables.size(); i++) {
+    string table_name = my_tables[i]->GetTableName();
+    //IndexInfo *my_index_info = nullptr;
+    //不知道如何在不知道index名字的情况下查找index
+  }
   return DB_FAILED;
-  //不知道show到哪里去
 }
 
 dberr_t ExecuteEngine::ExecuteCreateIndex(pSyntaxNode ast, ExecuteContext *context) {
@@ -302,11 +371,11 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext *context) {
   pSyntaxNode select_type = ast->child_;
   bool all_columns = false;
   vector<string> select_column_name;
-  //select * 模式
+  // select * 模式
   if (select_type->type_ == kNodeAllColumns) {
     all_columns = true;
-  } 
-  //select xxx, xxx, ... 模式
+  }
+  // select xxx, xxx, ... 模式
   else {
     pSyntaxNode select_column_node = select_type->child_;
     while (select_column_node != NULL) {
@@ -315,23 +384,23 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext *context) {
       select_column_node = select_column_node->next_;
     }
   }
-  //select ... from xxx
+  // select ... from xxx
   std::string table_name = select_type->next_->val_;
   TableInfo *my_table_info = nullptr;
   if (databese_now->catalog_mgr_->GetTable(table_name, my_table_info) == DB_FAILED) {
     //找不到该table
     return DB_FAILED;
   }
-  vector<Column*> my_columns = my_table_info->GetSchema()->GetColumns();
-  //select ... from xxx后面没有where
+  vector<Column *> my_columns = my_table_info->GetSchema()->GetColumns();
+  // select ... from xxx后面没有where
   if (select_type->next_->next_ == NULL) {
     for (auto iter = my_table_info->GetTableHeap()->Begin(nullptr); iter != my_table_info->GetTableHeap()->End();
          iter++) {
       Row my_row = *iter;
       select_rows.push_back(my_row);
     }
-  } 
-  //select * from xxx后面有where
+  }
+  // select * from xxx后面有where
   else {
     pSyntaxNode condition = select_type->next_->next_->child_;
     std::string what_char = condition->val_;
@@ -485,12 +554,16 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext *context) {
     }
   }
   //测试select结果
+  ofstream outfile;
+  outfile.open("show_databases.txt", ostream::out);
   for (uint32_t i = 0; i < select_rows.size(); i++) {
-    for (uint32_t j = 0; j < select_rows[i].GetFieldCount(); j++) {
-      std::cout << select_rows[i].GetField(j)->GetData() << " ";
+    vector<Field *> result_fields = select_rows[i].GetFields();
+    for (uint32_t j = 0; j < result_fields.size(); j++) {
+      outfile << result_fields[j]->GetData() << " ";
     }
-    std::cout << endl;
+    outfile << endl;
   }
+  outfile.close();
   if (all_columns == true) {
     return DB_SUCCESS;
   }
@@ -500,7 +573,7 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext *context) {
 dberr_t ExecuteEngine::ExecuteInsert(pSyntaxNode ast, ExecuteContext *context) {
   /*#ifdef ENABLE_EXECUTE_DEBUG
   LOG(INFO) << "ExecuteInsert" << std::endl;
-#endif
+  #endif
   return DB_FAILED;*/
   if (current_db_ == "") {
     //未选择database
@@ -527,39 +600,59 @@ dberr_t ExecuteEngine::ExecuteInsert(pSyntaxNode ast, ExecuteContext *context) {
         return DB_FAILED;
       } else {
         Field *tmp_field;
-        tmp_field->DeserializeFrom(column_value->val_, tmp_type, &tmp_field, true, my_table_info->GetMemHeap());
+        tmp_field = new Field(my_columns[i]->GetType());
         my_fields.push_back(*tmp_field);
       }
-    } else {
+    } 
+    else {
       Field *tmp_field;
       if (tmp_type == kTypeInt) {
-        for (uint32_t j = 0; column_value->val_[j] != '\0'; j++) {
-          if (column_value->val_[j] < '0' && column_value->val_[j] > '9' && column_value->val_[j] != '-') {
+        string tmp_val = column_value->val_;
+        for (uint32_t j = 0; j < tmp_val.length(); j++) {
+          if (tmp_val[j] < '0' && tmp_val[j] > '9' && tmp_val[j] != '-') {
             //不是整数
             return DB_FAILED;
           }
         }
-        tmp_field->DeserializeFrom(column_value->val_, tmp_type, &tmp_field, false, my_table_info->GetMemHeap());
-      } else if (tmp_type == kTypeFloat) {
-        for (uint32_t j = 0; column_value->val_[j] != '\0'; j++) {
-          if (column_value->val_[j] < '0' && column_value->val_[j] > '9' && column_value->val_[j] != '-' &&
-              column_value->val_[j] != '.') {
+        tmp_field = new Field(kTypeInt, stoi(column_value->val_));
+      } 
+      else if (tmp_type == kTypeFloat) {
+        string tmp_val = column_value->val_;
+        for (uint32_t j = 0; j < tmp_val.length(); j++) {
+          if (tmp_val[j] < '0' && tmp_val[j] > '9' && tmp_val[j] != '-' && tmp_val[j] != '.') {
             //不是小数
             return DB_FAILED;
           }
         }
-        tmp_field->DeserializeFrom(column_value->val_, tmp_type, &tmp_field, false, my_table_info->GetMemHeap());
-      } else if (tmp_type == kTypeInvalid) {
+        float tmp_float = stof(column_value->val_);
+        tmp_field = new Field(kTypeFloat, tmp_float);
+      } 
+      else if (tmp_type == kTypeInvalid) {
         //无效类型
         return DB_FAILED;
+      } 
+      else if (tmp_type == kTypeChar) {
+        string tmp_val = column_value->val_;
+        bool manage;
+        if (tmp_val.length() < my_columns[i]->GetLength()) {
+          manage = false;
+        } else {
+          manage = true;
+        }
+        tmp_field = new Field(kTypeChar, column_value->val_, tmp_val.length(), manage);
       }
       my_fields.push_back(*tmp_field);
     }
+    i++;
+    column_value = column_value->next_;
   }
-  Row my_row(my_fields);
+  if (column_value != NULL) {
+    std::cout << "Too many elements!" << std::endl;
+  }
+  Row *my_row = new Row(my_fields);
   // 主键/unique判断还没写
   // 插入引起的index更改不会写
-  my_table_info->GetTableHeap()->InsertTuple(my_row, nullptr);
+  my_table_info->GetTableHeap()->InsertTuple(*my_row, nullptr);
   return DB_SUCCESS;
 }
 
@@ -599,10 +692,19 @@ dberr_t ExecuteEngine::ExecuteTrxRollback(pSyntaxNode ast, ExecuteContext *conte
 }
 
 dberr_t ExecuteEngine::ExecuteExecfile(pSyntaxNode ast, ExecuteContext *context) {
-#ifdef ENABLE_EXECUTE_DEBUG
-  LOG(INFO) << "ExecuteExecfile" << std::endl;
-#endif
-  return DB_FAILED;
+  /*#ifdef ENABLE_EXECUTE_DEBUG
+    LOG(INFO) << "ExecuteInsert" << std::endl;
+    #endif
+    return DB_FAILED;*/
+  string txt_name = ast->child_->val_;
+  ifstream test_file;
+  test_file.open(txt_name, ios::in);
+  //该文件存在
+  if (test_file.good()) {
+    return DB_SUCCESS;
+  } else {
+    return DB_FAILED;
+  }
 }
 
 dberr_t ExecuteEngine::ExecuteQuit(pSyntaxNode ast, ExecuteContext *context) {
