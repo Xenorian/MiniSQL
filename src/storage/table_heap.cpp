@@ -157,7 +157,8 @@ bool TableHeap::GetTuple(Row *row, Transaction *txn) {
 TableIterator TableHeap::Begin(Transaction *txn) {
   RowId tmp = INVALID_ROWID;
   reinterpret_cast<TablePage *>(buffer_pool_manager_->FetchPage(first_page_id_))->GetFirstTupleRid(&tmp);
-  buffer_pool_manager_->UnpinPage(tmp.GetPageId(), false);
+  if (tmp.GetPageId() != INVALID_PAGE_ID)
+    buffer_pool_manager_->UnpinPage(tmp.GetPageId(), false);
   return TableIterator(tmp, buffer_pool_manager_, schema_, log_manager_, lock_manager_);
 }
 

@@ -89,8 +89,6 @@ CatalogManager::CatalogManager(BufferPoolManager *buffer_pool_manager, LockManag
     next_table_id_ = 0;
     next_index_id_ = 0;
     catalog_meta_ = CatalogMeta::NewInstance(heap_);
-    catalog_meta_->SerializeTo((buffer_pool_manager_->FetchPage(CATALOG_META_PAGE_ID))->GetData());
-    buffer_pool_manager_->UnpinPage(CATALOG_META_PAGE_ID, true);
   }
   else{
     Page* p = buffer_pool_manager->FetchPage(CATALOG_META_PAGE_ID);
@@ -132,6 +130,8 @@ CatalogManager::CatalogManager(BufferPoolManager *buffer_pool_manager, LockManag
 }
 
 CatalogManager::~CatalogManager() {
+  catalog_meta_->SerializeTo((buffer_pool_manager_->FetchPage(CATALOG_META_PAGE_ID))->GetData());
+  buffer_pool_manager_->UnpinPage(CATALOG_META_PAGE_ID, true);
   delete heap_;
 }
 
@@ -238,7 +238,7 @@ dberr_t CatalogManager::CreateIndex(const std::string &table_name, const string 
   for(auto i: index_keys){
     uint32_t t;
     dberr_t e = table_info->GetSchema()->GetColumnIndex(i, t);
-    if(e) return e; //DB_COLUMN_NAME_NOT_EXIST
+    if (e == DB_COLUMN_NAME_NOT_EXIST) return e;  // DB_COLUMN_NAME_NOT_EXIST
     key_map.push_back(t);
   }
 
@@ -246,6 +246,17 @@ dberr_t CatalogManager::CreateIndex(const std::string &table_name, const string 
 
   index_info = IndexInfo::Create(heap_);
   index_info->Init(index_meta_data_ptr,table_info,buffer_pool_manager_);
+  //put all the info into the new index
+
+  std::vector<Field> tmp_fields;
+  for (auto i = table_info->GetTableHeap()->Begin(nullptr); i != table_info->GetTableHeap()->End(); i++) {
+    tmp_fields.clear();
+    //get the key_field
+    for (auto j : key_map) tmp_fields.push_back(*(i->GetField(j)));
+    //ctor the key_row
+    Row tmp_row = Row(tmp_fields);
+    index_info->GetIndex()->InsertEntry(tmp_row, i->GetRowId(), nullptr);
+  }
 
   //将index的信息写入index_roots_page
   page_id_t page_id;
@@ -303,13 +314,17 @@ dberr_t CatalogManager::DropTable(const string &table_name) {
     // auto table_id = tmp->second;
     auto index = index_names_.find(table_name);
     for(auto i: index->second){ //delete indexes_
-      index_id_t index_id = i.second;
-      indexes_.erase(index_id);
-       //delete the data
+      DropIndex(table_name, i.first);
     }
+    //delete metapage
+    buffer_pool_manager_->DeletePage((catalog_meta_->table_meta_pages_[tmp->second]));
+    catalog_meta_->table_meta_pages_.erase(tmp->second);
+    // delete the table in disk
+    tables_[tmp->second]->GetTableHeap()->FreeHeap();
+    //delete metadata
+    tables_.erase(tmp->second);      // delete tables_
     table_names_.erase(table_name); //delete table_names_
     index_names_.erase(table_name); //delete index_names_
-    tables_.erase(tmp->second); //delete tables_
     return DB_SUCCESS;
   }
   else return DB_TABLE_NOT_EXIST; // not find
@@ -325,8 +340,12 @@ dberr_t CatalogManager::DropIndex(const string &table_name, const string &index_
       return DB_INDEX_NOT_FOUND;
     }
     auto index_id = tmp_index_id->second;
-
-
+    //1. delete index metapage
+    buffer_pool_manager_->DeletePage((catalog_meta_->index_meta_pages_[index_id]));
+    catalog_meta_->index_meta_pages_.erase(index_id);
+    //2. delete index itself
+    indexes_[index_id]->GetIndex()->Destroy();
+    //3. delete record
     indexes_.erase(index_id);
     tmp_index_table.erase(index_name);
     return DB_SUCCESS;

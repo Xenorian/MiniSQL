@@ -153,7 +153,7 @@ TEST(TableHeapTest, TableHeapUpdateTest) {
     Row row(*fields);
     table_heap->UpdateTuple(row, iter->GetRowId(), nullptr);
     row_values[row.GetRowId().Get()] = fields;
-    std::cerr << row_values.size() << " " << row.GetRowId().Get() << std::endl;
+
     // std::cout << row.GetRowId().GetPageId() << " : " << row.GetRowId().GetSlotNum() << endl;
     delete[] characters;
   }
