@@ -19,7 +19,12 @@ class Schema {
 public:
   explicit Schema(const std::vector<Column *> columns) : columns_(std::move(columns)) {}
 
+  explicit Schema(const std::vector<Column *> columns, const std::vector<Column *> pks)
+      : columns_(std::move(columns)), pks_(std::move(pks)) {}
+
   inline const std::vector<Column *> &GetColumns() const { return columns_; }
+
+  inline const std::vector<Column *> &GetPks() const { return pks_; }
 
   inline const Column *GetColumn(const uint32_t column_index) const { return columns_[column_index]; }
 
@@ -82,6 +87,7 @@ public:
 private:
   static constexpr uint32_t SCHEMA_MAGIC_NUM = 200715;
   std::vector<Column *> columns_;   /** don't need to delete pointer to column */
+  std::vector<Column *> pks_;
 };
 
 using IndexSchema = Schema;

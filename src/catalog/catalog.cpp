@@ -162,6 +162,20 @@ dberr_t CatalogManager::CreateTable(const string &table_name, TableSchema *schem
   table_names_[table_name] = next_table_id_++; //update table_names_ & next_table_id_
   index_names_.insert({table_name, std::unordered_map<std::string, index_id_t>()});
 
+  //prepare index for pk and unique key
+  //pk
+  CreateIndex(table_name, PKINDEX, table_meta->GetSchema()->GetPks(), nullptr);
+  //unique
+  std::vector<Column *> tmp_vec;
+  for (auto i = table_meta->GetSchema()->GetColumns().begin(); i != table_meta->GetSchema()->GetColumns().end(); i++) {
+    if ((*i)->IsUnique() == true) {
+      tmp_vec.clear();
+      tmp_vec.push_back(*i);
+      CreateIndex(table_name, UNIQUE_INDEX + to_string(i - table_meta->GetSchema()->GetColumns().begin()), tmp_vec,
+                  nullptr);
+    }
+  }
+
   buffer_pool_manager_->UnpinPage(CATALOG_META_PAGE_ID, true);
   buffer_pool_manager_->UnpinPage(page_id, true);
 
@@ -266,6 +280,58 @@ dberr_t CatalogManager::CreateIndex(const std::string &table_name, const string 
   cout<<"CreatIndex Success, <tid, pid> = "<<next_index_id_<<", "<<page_id<<endl;
   indexes_[next_index_id_] = index_info; //update indexes_
   index_names_[table_name][index_name] = next_index_id_++; //update index_names_ & next_index_id_
+
+  buffer_pool_manager_->UnpinPage(CATALOG_META_PAGE_ID, true);
+  buffer_pool_manager_->UnpinPage(page_id, true);
+
+  return DB_SUCCESS;
+}
+
+dberr_t CatalogManager::CreateIndex(const std::string &table_name, const string &index_name,
+                                    const std::vector<Column*> &index_keys, Transaction *txn) {
+  // ASSERT(false, "Not Implemented yet");
+  if (index_names_.find(table_name) == index_names_.end()) {
+    return DB_TABLE_NOT_EXIST;
+  }
+  auto tmp_index = index_names_[table_name];
+  if (tmp_index.find(index_name) != tmp_index.end()) {
+    return DB_INDEX_ALREADY_EXIST;
+  }
+
+  TableInfo *table_info;
+  auto err = GetTable(table_name, table_info);  // get table_info
+  if (err) return err;                          // error
+
+  std::vector<uint32_t> key_map;
+  for (auto i : index_keys) {
+    key_map.push_back(i->GetTableInd());
+  }
+
+  IndexMetadata *index_meta_data_ptr =
+      IndexMetadata::Create(next_index_id_, index_name, table_names_[table_name], key_map, heap_);
+
+  IndexInfo* index_info = IndexInfo::Create(heap_);
+  index_info->Init(index_meta_data_ptr, table_info, buffer_pool_manager_);
+  // put all the info into the new index
+
+  std::vector<Field> tmp_fields;
+  for (auto i = table_info->GetTableHeap()->Begin(nullptr); i != table_info->GetTableHeap()->End(); i++) {
+    tmp_fields.clear();
+    // get the key_field
+    for (auto j : key_map) tmp_fields.push_back(*(i->GetField(j)));
+    // ctor the key_row
+    Row tmp_row = Row(tmp_fields);
+    index_info->GetIndex()->InsertEntry(tmp_row, i->GetRowId(), nullptr);
+  }
+
+  //将index的信息写入index_roots_page
+  page_id_t page_id;
+  index_meta_data_ptr->SerializeTo(buffer_pool_manager_->NewPage(page_id)->GetData());
+  catalog_meta_->index_meta_pages_[next_index_id_] = page_id;  // update catalog_meta_
+  catalog_meta_->SerializeTo((buffer_pool_manager_->FetchPage(CATALOG_META_PAGE_ID))->GetData());
+  cout << "CreatIndex Success, <tid, pid> = " << next_index_id_ << ", " << page_id << endl;
+  indexes_[next_index_id_] = index_info;                    // update indexes_
+  index_names_[table_name][index_name] = next_index_id_++;  // update index_names_ & next_index_id_
 
   buffer_pool_manager_->UnpinPage(CATALOG_META_PAGE_ID, true);
   buffer_pool_manager_->UnpinPage(page_id, true);

@@ -3,6 +3,7 @@
 #include <string>
 
 #include <cstdio>
+#include <algorithm>
 #include "parser/syntax_tree_printer.h"
 #include "utils/tree_file_mgr.h"
 
@@ -66,10 +67,6 @@ dberr_t ExecuteEngine::Execute(pSyntaxNode ast, ExecuteContext* context) {
 }
 
 dberr_t ExecuteEngine::ExecuteCreateDatabase(pSyntaxNode ast, ExecuteContext* context) {
-    /*#ifdef ENABLE_EXECUTE_DEBUG
-    LOG(INFO) << "ExecuteDropIndex" << std::endl;
-    #endif
-    return DB_FAILED;*/
     std::string database_name = ast->child_->val_;
     //判断是否存在该database文件
     ifstream test_file;
@@ -194,9 +191,9 @@ dberr_t ExecuteEngine::ExecuteShowTables(pSyntaxNode ast, ExecuteContext* contex
         //未选择database
         return DB_FAILED;
     }
-    DBStorageEngine* databese_now = dbs_[current_db_];
+    DBStorageEngine* database_now = dbs_[current_db_];
     vector<TableInfo*> my_tables;
-    if (databese_now->catalog_mgr_->GetTables(my_tables) == DB_FAILED) {
+    if (database_now->catalog_mgr_->GetTables(my_tables) == DB_FAILED) {
         //无法获取table
         return DB_FAILED;
     }
@@ -226,25 +223,24 @@ dberr_t ExecuteEngine::ExecuteShowTables(pSyntaxNode ast, ExecuteContext* contex
 }
 
 dberr_t ExecuteEngine::ExecuteCreateTable(pSyntaxNode ast, ExecuteContext* context) {
-    /*#ifdef ENABLE_EXECUTE_DEBUG
-    LOG(INFO) << "ExecuteDropIndex" << std::endl;
-    #endif
-    return DB_FAILED;*/
+
     if (current_db_ == "") {
         //未选择database
         return DB_FAILED;
     }
-    DBStorageEngine* databese_now = dbs_[current_db_];
+    DBStorageEngine* database_now = dbs_[current_db_];
     std::string table_name = ast->child_->val_;
     TableInfo* my_tableinfo = nullptr;
-    if (databese_now->catalog_mgr_->GetTable(table_name, my_tableinfo) == DB_SUCCESS) {
+    if (database_now->catalog_mgr_->GetTable(table_name, my_tableinfo) == DB_SUCCESS) {
         //该table已存在
         return DB_FAILED;
     }
     pSyntaxNode definition = ast->child_->next_->child_;
     vector<Column*> column_definition;
     vector<std::string> primary_keys;
+    vector<Column *> pks;
     uint32_t index = 0;
+    //read the schema item
     while (definition != NULL) {
         std::string column_name;
         TypeId type;
@@ -301,9 +297,15 @@ dberr_t ExecuteEngine::ExecuteCreateTable(pSyntaxNode ast, ExecuteContext* conte
         definition = definition->next_;
         index++;
     }
-    TableSchema* my_schema = new TableSchema(column_definition);
-    // 主键现在还不能传
-    return databese_now->catalog_mgr_->CreateTable(table_name, my_schema, nullptr, my_tableinfo);
+    //transfer the string pk into Column* pk
+    if (TransferPks(primary_keys, column_definition, pks) == DB_FAILED) {
+      std::cerr << "Primary Key Definite Failed\n";
+      return DB_FAILED;
+    }
+
+    TableSchema *my_schema = new TableSchema(column_definition, pks);
+    // call the create table
+    return database_now->catalog_mgr_->CreateTable(table_name, my_schema, nullptr, my_tableinfo);
 }
 
 dberr_t ExecuteEngine::ExecuteDropTable(pSyntaxNode ast, ExecuteContext* context) {
@@ -316,8 +318,8 @@ dberr_t ExecuteEngine::ExecuteDropTable(pSyntaxNode ast, ExecuteContext* context
         return DB_FAILED;
     }
     std::string table_name = ast->child_->val_;
-    DBStorageEngine* databese_now = dbs_[current_db_];
-    return databese_now->catalog_mgr_->DropTable(table_name);
+    DBStorageEngine* database_now = dbs_[current_db_];
+    return database_now->catalog_mgr_->DropTable(table_name);
 }
 
 dberr_t ExecuteEngine::ExecuteShowIndexes(pSyntaxNode ast, ExecuteContext* context) {
@@ -329,18 +331,21 @@ dberr_t ExecuteEngine::ExecuteShowIndexes(pSyntaxNode ast, ExecuteContext* conte
         //未选择database
         return DB_FAILED;
     }
-    DBStorageEngine* databese_now = dbs_[current_db_];
-    vector<TableInfo*> my_tables;
-    if (databese_now->catalog_mgr_->GetTables(my_tables) == DB_FAILED) {
-        //无法获取table
-        return DB_FAILED;
+    DBStorageEngine* database_now = dbs_[current_db_];
+    
+    for (auto i = database_now->catalog_mgr_->GetIndexs_()->begin();
+         i != database_now->catalog_mgr_->GetIndexs_()->end(); i++) {
+        //table name and index name
+      cout << i->second->GetTableInfo()->GetTableName() << "\t"
+           << i->second->GetIndexName() << "\t";
+      //index keys
+      for (auto j = i->second->GetIndexKeySchema()->GetColumns().begin();
+           j != i->second->GetIndexKeySchema()->GetColumns().end(); j++) {
+        cout << (*j)->GetName() << ",";
+      }
+      cout << std::endl;
     }
-    for (uint32_t i = 0; i < my_tables.size(); i++) {
-        string table_name = my_tables[i]->GetTableName();
-        // IndexInfo *my_index_info = nullptr;
-        //不知道如何在不知道index名字的情况下查找index
-    }
-    return DB_FAILED;
+    return DB_SUCCESS;
 }
 
 dberr_t ExecuteEngine::ExecuteCreateIndex(pSyntaxNode ast, ExecuteContext* context) {
@@ -352,16 +357,16 @@ dberr_t ExecuteEngine::ExecuteCreateIndex(pSyntaxNode ast, ExecuteContext* conte
         //未选择database
         return DB_FAILED;
     }
-    DBStorageEngine* databese_now = dbs_[current_db_];
+    DBStorageEngine* database_now = dbs_[current_db_];
     std::string index_name = ast->child_->val_;
     std::string table_name = ast->child_->val_;
     TableInfo* my_table_info = nullptr;
     IndexInfo* my_index_info = nullptr;
-    if (databese_now->catalog_mgr_->GetTable(table_name, my_table_info) == DB_FAILED) {
+    if (database_now->catalog_mgr_->GetTable(table_name, my_table_info) == DB_FAILED) {
         //该table不存在
         return DB_FAILED;
     }
-    if (databese_now->catalog_mgr_->GetIndex(table_name, index_name, my_index_info) == DB_SUCCESS) {
+    if (database_now->catalog_mgr_->GetIndex(table_name, index_name, my_index_info) == DB_SUCCESS) {
         //该table的index已存在
         return DB_FAILED;
     }
@@ -373,7 +378,7 @@ dberr_t ExecuteEngine::ExecuteCreateIndex(pSyntaxNode ast, ExecuteContext* conte
         indexes = indexes->next_;
     }
     IndexInfo* index_info = nullptr;
-    return databese_now->catalog_mgr_->CreateIndex(table_name, index_name, index_keys, nullptr, index_info);
+    return database_now->catalog_mgr_->CreateIndex(table_name, index_name, index_keys, nullptr, index_info);
 }
 
 dberr_t ExecuteEngine::ExecuteDropIndex(pSyntaxNode ast, ExecuteContext* context) {
@@ -385,15 +390,17 @@ dberr_t ExecuteEngine::ExecuteDropIndex(pSyntaxNode ast, ExecuteContext* context
         //未选择database
         return DB_FAILED;
     }
-    DBStorageEngine* databese_now = dbs_[current_db_];
+    DBStorageEngine* database_now = dbs_[current_db_];
     std::string index_name = ast->child_->val_;
-    std::string table_name;
-    //只给index_name,去找table_name还不会
-    if (0) {
-        //找不到该index
-        return DB_FAILED;
+    auto i = database_now->catalog_mgr_->GetIndexNames_()->begin();
+    for (; i != database_now->catalog_mgr_->GetIndexNames_()->end(); i++) {
+      if (i->second.find(index_name) != i->second.end()) break;
     }
-    return databese_now->catalog_mgr_->DropIndex(table_name, index_name);
+    if (i == database_now->catalog_mgr_->GetIndexNames_()->end())
+      return DB_INDEX_NOT_FOUND;
+    else {
+      return database_now->catalog_mgr_->DropIndex(i->first, index_name);
+    }
 }
 
 dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext* context) {
@@ -405,7 +412,7 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext* context) {
         //未选择database
         return DB_FAILED;
     }
-    DBStorageEngine* databese_now = dbs_[current_db_];
+    DBStorageEngine* database_now = dbs_[current_db_];
     //符合条件的row
     vector<Row> select_rows;
     pSyntaxNode select_type = ast->child_;
@@ -427,7 +434,7 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext* context) {
     // select ... from xxx
     std::string table_name = select_type->next_->val_;
     TableInfo* my_table_info = nullptr;
-    if (databese_now->catalog_mgr_->GetTable(table_name, my_table_info) == DB_FAILED) {
+    if (database_now->catalog_mgr_->GetTable(table_name, my_table_info) == DB_FAILED) {
         //找不到该table
         return DB_FAILED;
     }
@@ -639,13 +646,13 @@ dberr_t ExecuteEngine::ExecuteInsert(pSyntaxNode ast, ExecuteContext* context) {
         //未选择database
         return DB_FAILED;
     }
-    DBStorageEngine* databese_now = dbs_[current_db_];
+    DBStorageEngine* database_now = dbs_[current_db_];
     std::string table_name = ast->child_->val_;
     TableInfo* my_table_info = nullptr;
     vector<Column*> my_columns;
     vector<Field> my_fields;
     pSyntaxNode column_value = ast->child_->next_->child_;
-    if (databese_now->catalog_mgr_->GetTable(table_name, my_table_info) == DB_FAILED) {
+    if (database_now->catalog_mgr_->GetTable(table_name, my_table_info) == DB_FAILED) {
         //找不到该table
         return DB_FAILED;
     }
@@ -808,4 +815,22 @@ dberr_t ExecuteEngine::ExecuteQuit(pSyntaxNode ast, ExecuteContext* context) {
     ASSERT(ast->type_ == kNodeQuit, "Unexpected node type.");
     context->flag_quit_ = true;
     return DB_SUCCESS;
+}
+
+//Support function
+dberr_t ExecuteEngine::TransferPks(std::vector<std::string> &in, std::vector<Column *> item,
+                                   std::vector<Column *> &out) {
+  auto i = in.begin();
+  auto j = item.begin();
+  for (i = in.begin(); i != in.end();i++) {
+    for (j = item.begin(); j != item.end();j++) {
+      if ((*j)->GetName() == *i) break;
+    }
+    if (j == item.end())
+      return DB_FAILED;
+    else
+      out.push_back(*j);
+  }
+
+  return DB_SUCCESS;
 }

@@ -14,6 +14,9 @@
 #include "transaction/log_manager.h"
 #include "transaction/transaction.h"
 
+#define PKINDEX "_pk_index"
+#define UNIQUE_INDEX "_unique_index"
+
 class CatalogMeta {
   friend class CatalogManager;
 
@@ -29,7 +32,8 @@ public:
   }
 
   inline index_id_t GetNextIndexId() const {
-    return index_meta_pages_.size() == 0 ? 0 : index_meta_pages_.rbegin()->first;
+
+      return index_meta_pages_.size() == 0 ? 0 : index_meta_pages_.rbegin()->first;
   }
 
   static CatalogMeta *NewInstance(MemHeap *heap) {
@@ -77,11 +81,21 @@ public:
 
   dberr_t GetTables(std::vector<TableInfo *> &tables) const;
 
+  inline std::unordered_map<table_id_t, TableInfo *> *GetTables_() { return &tables_; };
+
   dberr_t CreateIndex(const std::string &table_name, const std::string &index_name,
                       const std::vector<std::string> &index_keys, Transaction *txn,
                       IndexInfo *&index_info);
 
+  dberr_t CreateIndex(const std::string &table_name, const string &index_name,
+                              const std::vector<Column *> &index_keys, Transaction *txn);
+
   dberr_t GetIndex(const std::string &table_name, const std::string &index_name, IndexInfo *&index_info) const;
+
+  inline std::unordered_map<index_id_t, IndexInfo *> *GetIndexs_() { return &indexes_; };
+  inline std::unordered_map<std::string, std::unordered_map<std::string, index_id_t>> *GetIndexNames_() {
+    return &index_names_;
+  };
 
   dberr_t GetTableIndexes(const std::string &table_name, std::vector<IndexInfo *> &indexes) const;
 

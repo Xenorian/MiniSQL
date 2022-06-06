@@ -16,6 +16,16 @@ uint32_t Schema::SerializeTo(char *buf) const {
     columns_[i]->SerializeTo(tmp);
     tmp += columns_[i]->GetSerializedSize();
   }
+  //primary key
+  // vector_size
+  MACH_WRITE_UINT32(tmp, pks_.size());
+  tmp += sizeof(uint32_t);
+  // column_data
+  i = 0;
+  for (; i < pks_.size(); i++) {
+    pks_[i]->SerializeTo(tmp);
+    tmp += pks_[i]->GetSerializedSize();
+  }
 
   return tmp - buf;
 }
@@ -24,7 +34,8 @@ uint32_t Schema::GetSerializedSize() const {
   // replace with your code here
   uint32_t columns_size = 0;
   size_t i = 0;
-  for (; i < columns_.size(); i++) columns_size += columns_[i]->GetSerializedSize();
+  for (i=0 ; i < columns_.size(); i++) columns_size += columns_[i]->GetSerializedSize();
+  for (i = 0; i < pks_.size(); i++) columns_size += pks_[i]->GetSerializedSize();
   return sizeof(uint32_t) * 2 + columns_size;
 }
 
@@ -48,7 +59,18 @@ uint32_t Schema::DeserializeFrom(char *buf, Schema *&schema, MemHeap *heap) {
     Column::DeserializeFrom(tmp, (columns[i]), heap);
     tmp += columns[i]->GetSerializedSize();
   }
-  schema = new (mem) Schema(columns);
+  // pk
+  std::vector<Column *> pks;
+  vector_size = MACH_READ_UINT32(tmp);
+  tmp += sizeof(uint32_t);
+  i = 0;
+  for (; i < vector_size; i++) {
+    pks.push_back(NULL);
+    Column::DeserializeFrom(tmp, (pks[i]), heap);
+    tmp += pks[i]->GetSerializedSize();
+  }
+
+  schema = new (mem) Schema(columns, pks);
 
   return tmp - buf;
 }

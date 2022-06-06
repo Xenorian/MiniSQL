@@ -79,6 +79,9 @@ private:
 
   dberr_t ExecuteQuit(pSyntaxNode ast, ExecuteContext *context);
 
+  //Support function
+  dberr_t TransferPks(std::vector<std::string> &in, std::vector<Column *> item, std::vector<Column *> &out);
+
 private:
   std::unordered_map<std::string, DBStorageEngine *> dbs_;  /** all opened databases */
   std::string current_db_;  /** current database */
