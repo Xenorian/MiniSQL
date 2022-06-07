@@ -583,7 +583,7 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext* context) {
                   tmp_field = new Field(kTypeInt, tmp_compare_val);
                 }
                 else if (tmp_type == kTypeFloat) {
-                  int32_t tmp_compare_val = stof(expect_val);
+                  float tmp_compare_val = stof(expect_val);
                   tmp_field = new Field(kTypeFloat, tmp_compare_val);
                 }
                 else if (tmp_type == kTypeChar) {
