@@ -1,6 +1,7 @@
 #include "common/macros.h"
 #include "record/types.h"
 #include "record/field.h"
+#include <string>
 
 inline int CompareStrings(const char *str1, int len1, const char *str2, int len2) {
   assert(str1 != nullptr);
@@ -24,7 +25,7 @@ Type *Type::type_singletons_[] = {
 };
 
 uint32_t Type::SerializeTo(const Field &field, char *buf) const {
-  ASSERT(false, "SerializeTo not implemented.");
+  ASSERT(false, "DeserializeFrom not implemented.");
   return 0;
 }
 
@@ -105,6 +106,12 @@ uint32_t TypeInt::GetSerializedSize(const Field &field, bool is_null) const {
   return GetTypeSize(type_id_);
 }
 
+const char *TypeInt::GetData(const Field &val) const {
+  static std::string tmp_val;
+  tmp_val = std::to_string(val.value_.integer_);
+  return tmp_val.c_str();
+}
+
 CmpBool TypeInt::CompareEquals(const Field &left, const Field &right) const {
   ASSERT(left.CheckComparable(right), "Not comparable.");
   if (left.IsNull() || right.IsNull()) {
@@ -178,6 +185,12 @@ uint32_t TypeFloat::GetSerializedSize(const Field &field, bool is_null) const {
     return 0;
   }
   return GetTypeSize(type_id_);
+}
+
+const char *TypeFloat::GetData(const Field &val) const {
+  static std::string tmp_val;
+  tmp_val = std::to_string(val.value_.float_);
+  return tmp_val.c_str();
 }
 
 CmpBool TypeFloat::CompareEquals(const Field &left, const Field &right) const {
