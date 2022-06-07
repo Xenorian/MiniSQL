@@ -623,17 +623,6 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext* context) {
             }
         }
     }
-    //²âÊÔselect½á¹û
-    ofstream outfile;
-    outfile.open("show_databases.txt", ostream::out);
-    /*for (uint32_t i = 0; i < select_rows.size(); i++) {
-        vector<Field*> result_fields = select_rows[i].GetFields();
-        for (uint32_t j = 0; j < result_fields.size(); j++) {
-            outfile << result_fields[j]->GetData() << " ";
-        }
-        outfile << endl;
-    }*/
-    outfile.close();
     if (all_columns == true) {
         return DB_SUCCESS;
     }
@@ -704,18 +693,15 @@ dberr_t ExecuteEngine::ExecuteInsert(pSyntaxNode ast, ExecuteContext* context) {
                 return DB_FAILED;
             }
             else if (tmp_type == kTypeChar) {
-                //bool manage;
+                bool manage;
               char *tmp_val = column_value->val_;
-                /*if (tmp_val[strlen(tmp_val) - 1] == '\b') {
-                tmp_val[strlen(tmp_val) - 1] = '\0';
-                }*/
-                /*if (strlen(tmp_val) < my_columns[i]->GetLength()) {
+                if (strlen(tmp_val) < my_columns[i]->GetLength()) {
                     manage = false;
                 }
                 else {
                     manage = true;
-                }*/
-                tmp_field = new Field(kTypeChar, tmp_val, strlen(tmp_val), false);
+                }
+                tmp_field = new Field(kTypeChar, tmp_val, strlen(tmp_val), manage);
             }
             my_fields.push_back(*tmp_field);
         }
