@@ -452,6 +452,7 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext* context) {
         pSyntaxNode condition = select_type->next_->next_->child_;
         std::string what_char = condition->val_;
         pSyntaxNode compare = condition;
+        vector<pSyntaxNode> my_conditions;
         //有and和or
         if (what_char == "and" || what_char == "or") {
             while (1) {
@@ -459,19 +460,20 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext* context) {
                 if (tmp_val != "and" && tmp_val != "or") {
                     break;
                 }
+                my_conditions.push_back(compare);
                 compare = compare->child_;
             }
-            // =，>，<等符号开始出现的地方
-            pSyntaxNode compare_start = compare;
+            //compare一开始是最左下方的一个判断条件，节点在"="这种符号上
             for (auto iter = my_table_info->GetTableHeap()->Begin(nullptr); iter != my_table_info->GetTableHeap()->End();
                 iter++) {
+                int now = my_conditions.size() - 1;
                 Row my_row = *iter;
                 //每一个row是否满足条件
                 bool first_flag = true;
                 bool all_satisfy;
                 bool this_satisfy;
-                while (condition != compare_start && compare != NULL) {
-                    std::string tmp_condition = condition->val_;
+                while (1) {
+                    std::string tmp_condition = my_conditions[now]->val_;
                     std::string tmp_compare = compare->val_;
                     string compare_column_name = compare->child_->val_;
                     string expect_val = compare->child_->next_->val_;
@@ -487,17 +489,18 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext* context) {
                     Field* tmp_field;
                     if (tmp_type == kTypeInt) {
                         int32_t tmp_compare_val = stoi(expect_val);
-                        Field tmp_tmp_field(kTypeInt, tmp_compare_val);
-                        tmp_field = &tmp_tmp_field;
+                        tmp_field =  new Field(kTypeInt, tmp_compare_val);
                     }
                     else if (tmp_type == kTypeFloat) {
                         int32_t tmp_compare_val = stof(expect_val);
-                        Field tmp_tmp_field(kTypeFloat, tmp_compare_val);
-                        tmp_field = &tmp_tmp_field;
+                        tmp_field = new Field(kTypeFloat, tmp_compare_val);
                     }
                     else if (tmp_type == kTypeChar) {
-                        Field tmp_tmp_field(kTypeChar, compare->child_->next_->val_, expect_val.length(), true);
-                        tmp_field = &tmp_tmp_field;
+                      char *tmp_compare_val = compare->child_->next_->val_;
+                      /*if (tmp_compare_val[strlen(tmp_compare_val) - 1] == '\b') {
+                        tmp_compare_val[strlen(tmp_compare_val) - 1] = '\0';
+                      }*/
+                      tmp_field = new Field(kTypeChar, tmp_compare_val, strlen(tmp_compare_val), false);
                     }
                     else {
                         //数据类型有误
@@ -542,9 +545,12 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext* context) {
                             //传入了and和or以外的参数
                             return DB_FAILED;
                         }
-                        condition = condition->child_;
+                        now--;
+                        if (now < 0) {
+                          break;
+                        }
                     }
-                    compare = compare->next_;
+                    compare = my_conditions[now]->child_->next_;
                 }
                 if (all_satisfy == true) {
                     select_rows.push_back(my_row);
@@ -581,7 +587,7 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext* context) {
                   tmp_field = new Field(kTypeFloat, tmp_compare_val);
                 }
                 else if (tmp_type == kTypeChar) {
-                  tmp_field = new Field(kTypeChar, compare->child_->next_->val_, expect_val.length(), true);
+                  tmp_field = new Field(kTypeChar, compare->child_->next_->val_, expect_val.length(), false);
                 }
                 else {
                     //数据类型有误
@@ -698,18 +704,18 @@ dberr_t ExecuteEngine::ExecuteInsert(pSyntaxNode ast, ExecuteContext* context) {
                 return DB_FAILED;
             }
             else if (tmp_type == kTypeChar) {
-                bool manage;
+                //bool manage;
               char *tmp_val = column_value->val_;
-                if (tmp_val[strlen(tmp_val) - 1] == '\b') {
+                /*if (tmp_val[strlen(tmp_val) - 1] == '\b') {
                 tmp_val[strlen(tmp_val) - 1] = '\0';
-                }
-                if (strlen(tmp_val) < my_columns[i]->GetLength()) {
+                }*/
+                /*if (strlen(tmp_val) < my_columns[i]->GetLength()) {
                     manage = false;
                 }
                 else {
                     manage = true;
-                }
-                tmp_field = new Field(kTypeChar, tmp_val, strlen(tmp_val), manage);
+                }*/
+                tmp_field = new Field(kTypeChar, tmp_val, strlen(tmp_val), false);
             }
             my_fields.push_back(*tmp_field);
         }
