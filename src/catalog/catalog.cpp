@@ -105,7 +105,8 @@ CatalogManager::CatalogManager(BufferPoolManager *buffer_pool_manager, LockManag
       meta->DeserializeFrom(buffer_pool_manager->FetchPage(it.second)->GetData(), meta, heap_);
       TableInfo* tinfo=nullptr;
       tinfo = TableInfo::Create(heap_);
-      TableHeap *table_heap = TableHeap::Create(buffer_pool_manager_,meta->GetSchema(), nullptr, log_manager_, lock_manager_, heap_);
+      TableHeap *table_heap = TableHeap::Create(buffer_pool_manager_, meta->GetFirstPageId(), meta->GetSchema(), 
+                                                 log_manager_, lock_manager_, heap_);
       tinfo->Init(meta, table_heap);
       table_names_[meta->GetTableName()] = meta->GetTableId();
       tables_[meta->GetTableId()] = tinfo;
@@ -236,11 +237,11 @@ dberr_t CatalogManager::CreateIndex(const std::string &table_name, const string 
                                     const std::vector<std::string> &index_keys, Transaction *txn,
                                     IndexInfo *&index_info) {
   // ASSERT(false, "Not Implemented yet");
-  if(index_names_.find(table_name) == index_names_.end()){
+  if(table_names_.find(table_name) == table_names_.end()){
     return DB_TABLE_NOT_EXIST;
   }
-  auto tmp_index = index_names_[table_name];
-  if(tmp_index.find(index_name) != tmp_index.end()){
+  auto tmp_table_indexes = index_names_[table_name];
+  if (tmp_table_indexes.find(index_name) != tmp_table_indexes.end()) {
     return DB_INDEX_ALREADY_EXIST;
   }
 

@@ -359,7 +359,7 @@ dberr_t ExecuteEngine::ExecuteCreateIndex(pSyntaxNode ast, ExecuteContext* conte
     }
     DBStorageEngine* database_now = dbs_[current_db_];
     std::string index_name = ast->child_->val_;
-    std::string table_name = ast->child_->val_;
+    std::string table_name = ast->child_->next_->val_;
     TableInfo* my_table_info = nullptr;
     IndexInfo* my_index_info = nullptr;
     if (database_now->catalog_mgr_->GetTable(table_name, my_table_info) == DB_FAILED) {
@@ -624,7 +624,21 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext* context) {
         }
     }
     if (all_columns == true) {
+      for (auto i : select_rows) {
+        for (auto j : i.GetFields()) {
+          std::cout << j->GetData() << "\t";
+        }
+        std::cout << std::endl;
+      }
+
         return DB_SUCCESS;
+    }
+
+    for (auto i : select_rows) {
+      for (auto j : i.GetFields()) {
+        std::cout << j->GetData() << "\t";
+      }
+      std::cout << std::endl;
     }
     return DB_SUCCESS;
 }
@@ -643,6 +657,7 @@ dberr_t ExecuteEngine::ExecuteInsert(pSyntaxNode ast, ExecuteContext* context) {
     TableInfo* my_table_info = nullptr;
     vector<Column*> my_columns;
     vector<Field> my_fields;
+    vector<Field> pk_fields;
     pSyntaxNode column_value = ast->child_->next_->child_;
     if (database_now->catalog_mgr_->GetTable(table_name, my_table_info) == DB_FAILED) {
         //找不到该table
@@ -712,9 +727,77 @@ dberr_t ExecuteEngine::ExecuteInsert(pSyntaxNode ast, ExecuteContext* context) {
         std::cout << "Too many elements!" << std::endl;
     }
     Row* my_row = new Row(my_fields);
-    // 主键/unique判断还没写
-    // 插入引起的index更改不会写
+    //get pks
+    for (auto i : my_table_info->GetSchema()->GetPks()) {
+      if (my_row->GetField(i->GetTableInd())->IsNull() == true) {
+        std::cerr << "PK IS NULL\n";
+        return DB_FAILED;
+      }
+      pk_fields.push_back(*(my_row->GetField(i->GetTableInd())));
+    }
+    Row pk = Row(pk_fields);
+    // 主键/unique判断
+    //1. check the pk
+    if (((*(database_now->catalog_mgr_->GetIndexNames_()))[table_name]).find(PKINDEX) ==
+        ((*(database_now->catalog_mgr_->GetIndexNames_()))[table_name]).end()) {
+      std::cerr << "PK INDEX CANNT FIND\n";
+      return DB_FAILED;
+    }
+
+    index_id_t tmp_index_id = ((*(database_now->catalog_mgr_->GetIndexNames_()))[table_name])[PKINDEX];
+    if (database_now->catalog_mgr_->GetIndexs_()->find(tmp_index_id) ==
+        database_now->catalog_mgr_->GetIndexs_()->end()) {
+      std::cerr << "PK INDEX CANNT FIND\n";
+      return DB_FAILED;
+    }
+
+    IndexInfo *tmp_index = (*(database_now->catalog_mgr_->GetIndexs_()))[tmp_index_id];
+    std::vector<RowId> tmp_result;
+    tmp_index->GetIndex()->ScanKey(pk, tmp_result, nullptr);
+    if (tmp_result.empty() != true) {
+      std::cerr << "PK Already exists\n";
+      return DB_FAILED;
+    }
+
+    //2. check the unique
+    for (auto i = my_table_info->GetSchema()->GetColumns().begin();
+         i != my_table_info->GetSchema()->GetColumns().end();i++) {
+      int count = 1;
+      if ((*i)->IsUnique() == true) {
+        tmp_index_id =
+            ((*(database_now->catalog_mgr_->GetIndexNames_()))[table_name])[UNIQUE_INDEX + std::to_string(count)];
+        tmp_index = (*(database_now->catalog_mgr_->GetIndexs_()))[tmp_index_id];
+        tmp_result.clear();
+        pk_fields.clear();
+        pk_fields.push_back(*(my_row->GetField((*i)->GetTableInd())));
+        Row key = Row(pk_fields);
+        tmp_index->GetIndex()->ScanKey(key, tmp_result, nullptr);
+
+        if (tmp_result.empty() != true) {
+          std::cerr << "Unique item " << (*i)->GetName() << " Already exists\n ";
+          return DB_FAILED;
+        }
+
+        count++;
+      }
+    }
+
+    //insert into table
     my_table_info->GetTableHeap()->InsertTuple(*my_row, nullptr);
+    //insert into index
+    for (auto i = ((*(database_now->catalog_mgr_->GetIndexNames_()))[table_name]).begin();
+         i != ((*(database_now->catalog_mgr_->GetIndexNames_()))[table_name]).end(); i++) {
+      std::vector<Field> key_field;
+      tmp_index = (*(database_now->catalog_mgr_->GetIndexs_()))[i->second];
+      //get keys
+      for (auto j = tmp_index->GetIndexKeySchema()->GetColumns().begin();
+           j != tmp_index->GetIndexKeySchema()->GetColumns().end(); j++)
+        key_field.push_back(*(my_row->GetField((*j)->GetTableInd())));
+      Row key = Row(key_field);
+      (*(database_now->catalog_mgr_->GetIndexs_()))[i->second]->GetIndex()->InsertEntry(key, my_row->GetRowId(),
+                                                                                        nullptr);
+    }
+
     return DB_SUCCESS;
 }
 
