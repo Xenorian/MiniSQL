@@ -573,18 +573,15 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext* context) {
                 Field* real_field = my_row.GetField(j);
                 Field* tmp_field;
                 if (tmp_type == kTypeInt) {
-                    int32_t tmp_compare_val = stoi(expect_val);
-                    Field tmp_tmp_field(kTypeInt, tmp_compare_val);
-                    tmp_field = &tmp_tmp_field;
+                  int32_t tmp_compare_val = stoi(expect_val);
+                  tmp_field = new Field(kTypeInt, tmp_compare_val);
                 }
                 else if (tmp_type == kTypeFloat) {
-                    int32_t tmp_compare_val = stof(expect_val);
-                    Field tmp_tmp_field(kTypeFloat, tmp_compare_val);
-                    tmp_field = &tmp_tmp_field;
+                  int32_t tmp_compare_val = stof(expect_val);
+                  tmp_field = new Field(kTypeFloat, tmp_compare_val);
                 }
                 else if (tmp_type == kTypeChar) {
-                    Field tmp_tmp_field(kTypeChar, compare->child_->next_->val_, expect_val.length(), true);
-                    tmp_field = &tmp_tmp_field;
+                  tmp_field = new Field(kTypeChar, compare->child_->next_->val_, expect_val.length(), true);
                 }
                 else {
                     //数据类型有误
@@ -623,13 +620,13 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext* context) {
     //测试select结果
     ofstream outfile;
     outfile.open("show_databases.txt", ostream::out);
-    for (uint32_t i = 0; i < select_rows.size(); i++) {
+    /*for (uint32_t i = 0; i < select_rows.size(); i++) {
         vector<Field*> result_fields = select_rows[i].GetFields();
         for (uint32_t j = 0; j < result_fields.size(); j++) {
             outfile << result_fields[j]->GetData() << " ";
         }
         outfile << endl;
-    }
+    }*/
     outfile.close();
     if (all_columns == true) {
         return DB_SUCCESS;
@@ -701,15 +698,18 @@ dberr_t ExecuteEngine::ExecuteInsert(pSyntaxNode ast, ExecuteContext* context) {
                 return DB_FAILED;
             }
             else if (tmp_type == kTypeChar) {
-                string tmp_val = column_value->val_;
                 bool manage;
-                if (tmp_val.length() < my_columns[i]->GetLength()) {
+              char *tmp_val = column_value->val_;
+                if (tmp_val[strlen(tmp_val) - 1] == '\b') {
+                tmp_val[strlen(tmp_val) - 1] = '\0';
+                }
+                if (strlen(tmp_val) < my_columns[i]->GetLength()) {
                     manage = false;
                 }
                 else {
                     manage = true;
                 }
-                tmp_field = new Field(kTypeChar, column_value->val_, tmp_val.length(), manage);
+                tmp_field = new Field(kTypeChar, tmp_val, strlen(tmp_val), manage);
             }
             my_fields.push_back(*tmp_field);
         }
@@ -778,6 +778,7 @@ dberr_t ExecuteEngine::ExecuteExecfile(pSyntaxNode ast, ExecuteContext* context)
             fscanf(txt, "%[^;]%*c", code);
             strcat(code, ";");
             YY_BUFFER_STATE bp = yy_scan_string(code);
+            cout << "code = " << code << endl;
             if (bp == nullptr) {
                 LOG(ERROR) << "Failed to create yy buffer state." << std::endl;
                 exit(-1);
@@ -789,7 +790,7 @@ dberr_t ExecuteEngine::ExecuteExecfile(pSyntaxNode ast, ExecuteContext* context)
                 printf("%s\n", MinisqlParserGetErrorMessage());
             }
             Execute(MinisqlGetParserRootNode(), context);
-            sleep(1);
+            //sleep(1);
             MinisqlParserFinish();
             yy_delete_buffer(bp);
             yylex_destroy();
