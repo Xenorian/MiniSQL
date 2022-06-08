@@ -23,28 +23,40 @@ dberr_t ExecuteEngine::Execute(pSyntaxNode ast, ExecuteContext* context) {
     }
     switch (ast->type_) {
     case kNodeCreateDB:
+        //OK
         return ExecuteCreateDatabase(ast, context);
     case kNodeDropDB:
+        //OK
         return ExecuteDropDatabase(ast, context);
     case kNodeShowDB:
+        //Not
         return ExecuteShowDatabases(ast, context);
     case kNodeUseDB:
+        //OK
         return ExecuteUseDatabase(ast, context);
     case kNodeShowTables:
+        //OK
         return ExecuteShowTables(ast, context);
     case kNodeCreateTable:
+        //OK
         return ExecuteCreateTable(ast, context);
     case kNodeDropTable:
+        //OK
         return ExecuteDropTable(ast, context);
     case kNodeShowIndexes:
+        //OK
         return ExecuteShowIndexes(ast, context);
     case kNodeCreateIndex:
+        //OK
         return ExecuteCreateIndex(ast, context);
     case kNodeDropIndex:
+        //?
         return ExecuteDropIndex(ast, context);
     case kNodeSelect:
+        //?
         return ExecuteSelect(ast, context);
     case kNodeInsert:
+        //OK
         return ExecuteInsert(ast, context);
     case kNodeDelete:
         return ExecuteDelete(ast, context);
@@ -894,6 +906,7 @@ dberr_t ExecuteEngine::ExecuteQuit(pSyntaxNode ast, ExecuteContext* context) {
 }
 
 //Support function
+//create table
 dberr_t ExecuteEngine::TransferPks(std::vector<std::string> &in, std::vector<Column *> item,
                                    std::vector<Column *> &out) {
   auto i = in.begin();
@@ -909,4 +922,138 @@ dberr_t ExecuteEngine::TransferPks(std::vector<std::string> &in, std::vector<Col
   }
 
   return DB_SUCCESS;
+}
+//Where clouse
+Field *MakeField(std::string &expect_val, TypeId tmp_type) {  
+  Field *tmp_field;
+  if (tmp_type == kTypeInt) {
+    int32_t tmp_compare_val = stoi(expect_val);
+    tmp_field = new Field(kTypeInt, tmp_compare_val);
+  } else if (tmp_type == kTypeFloat) {
+    float tmp_compare_val = stof(expect_val);
+    tmp_field = new Field(kTypeFloat, tmp_compare_val);
+  } else if (tmp_type == kTypeChar) {
+    tmp_field = new Field(kTypeChar, const_cast<char*>(expect_val.c_str()), expect_val.length(), false);
+  } else {
+    //数据类型有误
+    return nullptr;
+  }
+
+  return tmp_field;
+}
+
+dberr_t GetRowSet(DBStorageEngine *database_now,std::vector<Row> &result, TableInfo *table, std::string &condition,
+               string compare_column_name,std::string &val) {
+  //get the column
+  Column *target = nullptr;
+  for (auto i = table->GetSchema()->GetColumns().begin(); i != table->GetSchema()->GetColumns().end();i++) {
+    if ((*i)->GetName() == compare_column_name) {
+      target = (*i);
+      break;
+    }
+    if (i == table->GetSchema()->GetColumns().end()) {
+      std::cerr << "Where condition is wrong, Cannot find the column\n";
+      return DB_FAILED;
+    }
+  }
+  //try to find a index
+  auto vec = &((*(database_now->catalog_mgr_->GetIndexNames_()))[table->GetTableName()]);
+  auto i = vec->begin();
+  for (i; i != vec->end(); i++) {
+    uint32_t num = 0;
+    if (((*(database_now->catalog_mgr_->GetIndexs_()))[i->second])->GetIndexKeySchema()->GetColumnCount() == 1 &&
+        ((*(database_now->catalog_mgr_->GetIndexs_()))[i->second])
+                ->GetIndexKeySchema()
+                ->GetColumnIndex(compare_column_name, num) == DB_SUCCESS) {
+      break;
+    }
+  }
+  //get the key
+  Field *key_f = MakeField(val, target->GetType());
+  Field *record_field = nullptr;
+  if (key_f == nullptr) {
+    std::cerr << "Field make failed\n";
+    return DB_FAILED;
+  }
+
+  std::vector<Field> key_fs;
+  key_fs.push_back(*key_f);
+  Row key = Row(key_fs);
+  std::vector<RowId> result_ids;
+  
+  if (condition == "=") {
+    if (i != vec->end()) {
+      ((*(database_now->catalog_mgr_->GetIndexs_()))[i->second])->GetIndex()->ScanKey(key, result_ids, nullptr);
+      for (auto j = result_ids.begin(); j != result_ids.end(); j++)
+      {
+        Row tmp_row = Row(*j);
+        table->GetTableHeap()->GetTuple(&tmp_row, nullptr);
+        result.push_back(tmp_row);
+      }
+    }else {
+      for (auto i = table->GetTableHeap()->Begin(nullptr); i != table->GetTableHeap()->End(); i++) {
+        record_field = i->GetField(target->GetTableInd());
+        if (record_field->CompareEquals(*key_f) == true) result.push_back(*i);
+      }
+    }
+
+
+
+  } else if (condition == ">") {
+    for (auto i = table->GetTableHeap()->Begin(nullptr); i != table->GetTableHeap()->End(); i++) {
+      record_field = i->GetField(target->GetTableInd());
+      if (record_field->CompareGreaterThan(*key_f) == true) result.push_back(*i);
+    }
+  } else if (condition == "<") {
+    for (auto i = table->GetTableHeap()->Begin(nullptr); i != table->GetTableHeap()->End(); i++) {
+      record_field = i->GetField(target->GetTableInd());
+      if (record_field->CompareLessThan(*key_f) == true) result.push_back(*i);
+    }
+  } else if (condition == ">=") {
+    for (auto i = table->GetTableHeap()->Begin(nullptr); i != table->GetTableHeap()->End(); i++) {
+      record_field = i->GetField(target->GetTableInd());
+      if (record_field->CompareGreaterThanEquals(*key_f) == true) result.push_back(*i);
+    }
+  } else if (condition == "<=") {
+    for (auto i = table->GetTableHeap()->Begin(nullptr); i != table->GetTableHeap()->End(); i++) {
+      record_field = i->GetField(target->GetTableInd());
+      if (record_field->CompareLessThanEquals(*key_f) == true) result.push_back(*i);
+    }
+  } else if (condition == "<>") {
+    for (auto i = table->GetTableHeap()->Begin(nullptr); i != table->GetTableHeap()->End(); i++) {
+      record_field = i->GetField(target->GetTableInd());
+      if (record_field->CompareNotEquals(*key_f) == true) result.push_back(*i);
+    }
+  }
+}
+
+void Intersect(std::vector<Row> &a, std::vector<Row> &b, std::vector<Row> &result) {
+  std::unordered_map<int64_t, Row *> map;
+  for (auto i = a.begin(); i != a.end(); i++) {
+    map.insert(make_pair((i->GetRowId().Get()), &(*i)));
+  }
+
+  for (auto i = b.begin(); i != b.end(); i++) {
+    if (map.find(i->GetRowId().Get()) != map.end()) {
+      result.push_back(*i);
+    } else {
+      // not exists in both set
+    }
+  }
+}
+
+void Union(std::vector<Row> &a, std::vector<Row> &b, std::vector<Row> &result) {
+  std::unordered_map<int64_t, Row *> map;
+  for (auto i = a.begin(); i != a.end(); i++) {
+    map.insert(make_pair((i->GetRowId().Get()), &(*i)));
+    result.push_back(*i);
+  }
+
+  for (auto i = b.begin(); i != b.end(); i++) {
+    if (map.find(i->GetRowId().Get()) != map.end()) {
+        //already exists
+    } else {
+      result.push_back(*i);
+    }
+  }
 }
