@@ -13,7 +13,7 @@
 class DBStorageEngine {
 public:
   explicit DBStorageEngine(std::string db_name, bool init = true,
-                           uint32_t buffer_pool_size = DEFAULT_BUFFER_POOL_SIZE)
+                           uint32_t buffer_pool_size = DEFAULT_BUFFER_POOL_SIZE*3)
           : db_file_name_(std::move(db_name)), init_(init) {
     // Init database file if needed
     if (init_) {
@@ -51,6 +51,7 @@ public:
   DiskManager *disk_mgr_;
   BufferPoolManager *bpm_;
   CatalogManager *catalog_mgr_;
+  SimpleMemHeap global_heap;
   std::string db_file_name_;
   bool init_;
 };

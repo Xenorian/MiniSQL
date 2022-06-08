@@ -81,6 +81,13 @@ private:
 
   //Support function
   dberr_t TransferPks(std::vector<std::string> &in, std::vector<Column *> item, std::vector<Column *> &out);
+  dberr_t GetRowSet(DBStorageEngine *database_now, std::vector<Row> &result, TableInfo *table, std::string &condition,
+                    string compare_column_name, std::string &val,SimpleMemHeap& heap);
+  Field *MakeField(std::string &expect_val, TypeId tmp_type, SimpleMemHeap &heap);
+  void Intersect(std::vector<Row> &a, std::vector<Row> &b, std::vector<Row> &result);
+  void Union(std::vector<Row> &a, std::vector<Row> &b, std::vector<Row> &result);
+
+  dberr_t Insert(DBStorageEngine *database_now, TableInfo *my_table_info, Row *my_row);
 
 private:
   std::unordered_map<std::string, DBStorageEngine *> dbs_;  /** all opened databases */

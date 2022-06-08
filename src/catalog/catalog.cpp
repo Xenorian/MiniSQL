@@ -1,5 +1,6 @@
 #include "catalog/catalog.h"
-
+#include <vector>
+#include <string>
 void CatalogMeta::SerializeTo(char *buf) const {
   // ASSERT(false, "Not Implemented yet");
   uint32_t ofs = 0;
@@ -257,6 +258,20 @@ dberr_t CatalogManager::CreateIndex(const std::string &table_name, const string 
     key_map.push_back(t);
   }
 
+  if (key_map.size() == 1) {
+    if (table_info->GetSchema()->GetColumn(key_map[0])->IsUnique() == false) {
+      if (table_info->GetSchema()->GetPks().size() >= 2) {
+        std::cerr << "Cann't create index on not unique key\n";
+        return DB_FAILED;
+      } else if (table_info->GetSchema()->GetPks()[0]->GetTableInd() != key_map[0]) {
+        std::cerr << "Cann't create index on not unique key\n";
+        return DB_FAILED;
+      }
+    }
+  } else {
+    std::cerr << "Mutiple key index is an experiment function\n";
+  }
+
   IndexMetadata * index_meta_data_ptr =  IndexMetadata::Create(next_index_id_, index_name, table_names_[table_name],key_map,heap_ );
 
   index_info = IndexInfo::Create(heap_);
@@ -380,9 +395,16 @@ dberr_t CatalogManager::DropTable(const string &table_name) {
   if (tmp != table_names_.end()){ //find the table
     // auto table_id = tmp->second;
     auto index = index_names_.find(table_name);
-    for(auto i: index->second){ //delete indexes_
-      DropIndex(table_name, i.first);
+    std::vector<std::string> del_indexs;
+
+    for (auto i = index->second.begin(); i != index->second.end(); i++) {  // delete indexes_
+      del_indexs.push_back(i->first);
     }
+
+    for (auto i : del_indexs) {  // delete indexes_
+      DropIndex(table_name, i);
+    }
+
     //delete metapage
     buffer_pool_manager_->DeletePage((catalog_meta_->table_meta_pages_[tmp->second]));
     catalog_meta_->table_meta_pages_.erase(tmp->second);
@@ -414,7 +436,7 @@ dberr_t CatalogManager::DropIndex(const string &table_name, const string &index_
     indexes_[index_id]->GetIndex()->Destroy();
     //3. delete record
     indexes_.erase(index_id);
-    tmp_index_table.erase(index_name);
+    index_names_[table_name].erase(index_name);
     return DB_SUCCESS;
   }
   else return DB_TABLE_NOT_EXIST; // not find

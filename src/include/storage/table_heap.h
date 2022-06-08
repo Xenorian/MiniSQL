@@ -105,6 +105,7 @@ private:
    TablePage *first_page = (TablePage*)buffer_pool_manager->NewPage(first_page_id_);
    first_page->Init(first_page_id_, INVALID_PAGE_ID, log_manager_, txn);
    first_page->SetNextPageId(INVALID_PAGE_ID);
+   buffer_pool_manager->UnpinPage(first_page_id_, true);
  };
 
   /**

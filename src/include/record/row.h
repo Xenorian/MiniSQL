@@ -94,8 +94,16 @@ public:
 
   inline size_t GetFieldCount() const { return fields_.size(); }
 
-private:
-  Row &operator=(const Row &other) = delete;
+  Row &operator=(const Row &other) { 
+    rid_ = other.GetRowId();
+    for (auto i : other.GetFields_read_only()) {
+      fields_.push_back(new (heap_->Allocate(sizeof(*i))) Field(*i));
+    }
+
+    return *this;
+  }
+
+ private:
 
 private:
   RowId rid_{};

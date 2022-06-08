@@ -3,6 +3,8 @@
 #include <string>
 
 #include <cstdio>
+#include <set>
+#include <chrono>
 #include <algorithm>
 #include "parser/syntax_tree_printer.h"
 #include "utils/tree_file_mgr.h"
@@ -21,61 +23,84 @@ dberr_t ExecuteEngine::Execute(pSyntaxNode ast, ExecuteContext* context) {
     if (ast == nullptr) {
         return DB_FAILED;
     }
+    dberr_t ret_val = DB_FAILED;
+    auto start = std::chrono::high_resolution_clock::now();
     switch (ast->type_) {
     case kNodeCreateDB:
-        //OK
-        return ExecuteCreateDatabase(ast, context);
+      ret_val = ExecuteCreateDatabase(ast, context);
+      break;
     case kNodeDropDB:
         //OK
-        return ExecuteDropDatabase(ast, context);
+        ret_val = ExecuteDropDatabase(ast, context);
+        break;
     case kNodeShowDB:
         //Not
-        return ExecuteShowDatabases(ast, context);
+        ret_val = ExecuteShowDatabases(ast, context);
+        break;
     case kNodeUseDB:
         //OK
-        return ExecuteUseDatabase(ast, context);
+        ret_val = ExecuteUseDatabase(ast, context);
+        break;
     case kNodeShowTables:
         //OK
-        return ExecuteShowTables(ast, context);
+        ret_val = ExecuteShowTables(ast, context);
+        break;
     case kNodeCreateTable:
         //OK
-        return ExecuteCreateTable(ast, context);
+        ret_val = ExecuteCreateTable(ast, context);
+        break;
     case kNodeDropTable:
         //OK
-        return ExecuteDropTable(ast, context);
+        ret_val = ExecuteDropTable(ast, context);
+        break;
     case kNodeShowIndexes:
         //OK
-        return ExecuteShowIndexes(ast, context);
+        ret_val = ExecuteShowIndexes(ast, context);
+        break;
     case kNodeCreateIndex:
         //OK
-        return ExecuteCreateIndex(ast, context);
+        ret_val = ExecuteCreateIndex(ast, context);
+        break;
     case kNodeDropIndex:
         //?
-        return ExecuteDropIndex(ast, context);
+        ret_val = ExecuteDropIndex(ast, context);
+        break;
     case kNodeSelect:
         //?
-        return ExecuteSelect(ast, context);
+        ret_val = ExecuteSelect(ast, context);
+        break;
     case kNodeInsert:
         //OK
-        return ExecuteInsert(ast, context);
+        ret_val = ExecuteInsert(ast, context);
+        break;
     case kNodeDelete:
-        return ExecuteDelete(ast, context);
+        ret_val = ExecuteDelete(ast, context);
+      break;
     case kNodeUpdate:
-        return ExecuteUpdate(ast, context);
+        ret_val = ExecuteUpdate(ast, context);
+      break;
     case kNodeTrxBegin:
-        return ExecuteTrxBegin(ast, context);
+        ret_val = ExecuteTrxBegin(ast, context);
+      break;
     case kNodeTrxCommit:
-        return ExecuteTrxCommit(ast, context);
+        ret_val = ExecuteTrxCommit(ast, context);
+      break;
     case kNodeTrxRollback:
-        return ExecuteTrxRollback(ast, context);
+        ret_val = ExecuteTrxRollback(ast, context);
+      break;
     case kNodeExecFile:
-        return ExecuteExecfile(ast, context);
+        ret_val = ExecuteExecfile(ast, context);
+      break;
     case kNodeQuit:
-        return ExecuteQuit(ast, context);
+        ret_val = ExecuteQuit(ast, context);
+      break;
     default:
         break;
     }
-    return DB_FAILED;
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<float> duration = end - start;
+    std::cout << duration.count() << "s" << std::endl;
+    return ret_val;
 }
 
 dberr_t ExecuteEngine::ExecuteCreateDatabase(pSyntaxNode ast, ExecuteContext* context) {
@@ -199,8 +224,12 @@ dberr_t ExecuteEngine::ExecuteShowTables(pSyntaxNode ast, ExecuteContext* contex
       LOG(INFO) << "ExecuteDropIndex" << std::endl;
       #endif
       return DB_FAILED;*/
+
+    return DB_SUCCESS;
+
     if (current_db_ == "") {
         //未选择database
+      std::cerr << "no db is chosen\n";
         return DB_FAILED;
     }
     DBStorageEngine* database_now = dbs_[current_db_];
@@ -209,35 +238,36 @@ dberr_t ExecuteEngine::ExecuteShowTables(pSyntaxNode ast, ExecuteContext* contex
         //无法获取table
         return DB_FAILED;
     }
-    ofstream outfile;
-    outfile.open("show_tables.txt", ostream::out);
+
     for (uint32_t i = 0; i < my_tables.size(); i++) {
-        outfile << my_tables[i]->GetTableId() << " " << my_tables[i]->GetTableName() << endl;
+        std::cout << my_tables[i]->GetTableId() << " " << my_tables[i]->GetTableName() << endl;
         Schema* my_schema = my_tables[i]->GetSchema();
         vector<Column*> my_columns = my_schema->GetColumns();
         for (uint32_t j = 0; j < my_columns.size(); j++) {
-            outfile << my_columns[j]->GetName() << "(";
+            std::cout << my_columns[j]->GetName() << "(";
             if (my_columns[j]->GetType() == kTypeChar) {
-                outfile << "char"
+                std::cout << "char"
                     << " " << my_columns[j]->GetLength() << ") ";
             }
             else if (my_columns[j]->GetType() == kTypeInt) {
-                outfile << "int) ";
+                std::cout << "int) ";
             }
             else {
-                outfile << "float) ";
+                std::cout << "float) ";
             }
         }
-        outfile << endl;
+        std::cout << endl;
     }
-    outfile.close();
+
     return DB_SUCCESS;
 }
 
 dberr_t ExecuteEngine::ExecuteCreateTable(pSyntaxNode ast, ExecuteContext* context) {
+  SimpleMemHeap local_heap;
 
     if (current_db_ == "") {
         //未选择database
+      std::cerr << "no db is chosen\n";
         return DB_FAILED;
     }
     DBStorageEngine* database_now = dbs_[current_db_];
@@ -298,11 +328,15 @@ dberr_t ExecuteEngine::ExecuteCreateTable(pSyntaxNode ast, ExecuteContext* conte
                 type = kTypeInvalid;
             }
             if (type == kTypeChar) {
-                Column* tmp = new Column(column_name, type, length, index, nullable, unique);
+              Column *tmp =
+                  new (database_now->global_heap.Allocate(sizeof(Column(column_name, type, length, index, nullable, unique))))
+                      Column(column_name, type, length, index, nullable, unique);
                 column_definition.push_back(tmp);
             }
             else {
-                Column* tmp = new Column(column_name, type, index, nullable, unique);
+              Column *tmp =
+                  new (database_now->global_heap.Allocate(sizeof(Column(column_name, type, index, nullable, unique))))
+                      Column(column_name, type, index, nullable, unique);
                 column_definition.push_back(tmp);
             }
         }
@@ -315,6 +349,7 @@ dberr_t ExecuteEngine::ExecuteCreateTable(pSyntaxNode ast, ExecuteContext* conte
       return DB_FAILED;
     }
 
+    
     TableSchema *my_schema = new TableSchema(column_definition, pks);
     // call the create table
     return database_now->catalog_mgr_->CreateTable(table_name, my_schema, nullptr, my_tableinfo);
@@ -327,6 +362,7 @@ dberr_t ExecuteEngine::ExecuteDropTable(pSyntaxNode ast, ExecuteContext* context
     return DB_FAILED;*/
     if (current_db_ == "") {
         //未选择database
+      std::cerr << "no db is chosen\n";
         return DB_FAILED;
     }
     std::string table_name = ast->child_->val_;
@@ -341,6 +377,7 @@ dberr_t ExecuteEngine::ExecuteShowIndexes(pSyntaxNode ast, ExecuteContext* conte
       return DB_FAILED;*/
     if (current_db_ == "") {
         //未选择database
+      std::cerr << "no db is chosen\n";
         return DB_FAILED;
     }
     DBStorageEngine* database_now = dbs_[current_db_];
@@ -367,6 +404,7 @@ dberr_t ExecuteEngine::ExecuteCreateIndex(pSyntaxNode ast, ExecuteContext* conte
     return DB_FAILED;*/
     if (current_db_ == "") {
         //未选择database
+      std::cerr << "no db is chosen\n";
         return DB_FAILED;
     }
     DBStorageEngine* database_now = dbs_[current_db_];
@@ -400,6 +438,7 @@ dberr_t ExecuteEngine::ExecuteDropIndex(pSyntaxNode ast, ExecuteContext* context
     return DB_FAILED;*/
     if (current_db_ == "") {
         //未选择database
+      std::cerr << "no db is chosen\n";
         return DB_FAILED;
     }
     DBStorageEngine* database_now = dbs_[current_db_];
@@ -420,16 +459,20 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext* context) {
       LOG(INFO) << "ExecuteDropIndex" << std::endl;
       #endif
       return DB_FAILED;*/
+  SimpleMemHeap local_heap;
+
     if (current_db_ == "") {
         //未选择database
+      std::cerr << "no db is chosen\n";
         return DB_FAILED;
     }
     DBStorageEngine* database_now = dbs_[current_db_];
     //符合条件的row
-    vector<Row> select_rows;
+    std::vector<Row> select_rows;
     pSyntaxNode select_type = ast->child_;
     bool all_columns = false;
-    vector<string> select_column_name;
+    std::vector<string> select_column_name;
+    std::set<uint32_t> column_map;
     // select * 模式
     if (select_type->type_ == kNodeAllColumns) {
         all_columns = true;
@@ -443,15 +486,26 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext* context) {
             select_column_node = select_column_node->next_;
         }
     }
-    // select ... from xxx
+    // from xxx
+    // only one table is supported
     std::string table_name = select_type->next_->val_;
     TableInfo* my_table_info = nullptr;
-    if (database_now->catalog_mgr_->GetTable(table_name, my_table_info) == DB_FAILED) {
+    if (database_now->catalog_mgr_->GetTable(table_name, my_table_info)) {
         //找不到该table
+      std::cerr << "No such table\n";
         return DB_FAILED;
     }
     vector<Column*> my_columns = my_table_info->GetSchema()->GetColumns();
-    // select ... from xxx后面没有where
+    for (auto i : select_column_name) {
+      uint32_t index = 0;
+      if (my_table_info->GetSchema()->GetColumnIndex(i, index)) {
+        std::cerr << "Wrong column\n";
+        return DB_FAILED;
+      }
+      column_map.insert(index);
+    }
+
+    // from xxx后面没有where
     if (select_type->next_->next_ == NULL) {
         for (auto iter = my_table_info->GetTableHeap()->Begin(nullptr); iter != my_table_info->GetTableHeap()->End();
             iter++) {
@@ -459,182 +513,51 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext* context) {
             select_rows.push_back(my_row);
         }
     }
-    // select * from xxx后面有where
+    // from xxx后面有where
     else {
         pSyntaxNode condition = select_type->next_->next_->child_;
-        std::string what_char = condition->val_;
         pSyntaxNode compare = condition;
-        vector<pSyntaxNode> my_conditions;
-        //有and和or
-        if (what_char == "and" || what_char == "or") {
-            while (1) {
-                std::string tmp_val = compare->val_;
-                if (tmp_val != "and" && tmp_val != "or") {
-                    break;
-                }
-                my_conditions.push_back(compare);
-                compare = compare->child_;
-            }
-            //compare一开始是最左下方的一个判断条件，节点在"="这种符号上
-            for (auto iter = my_table_info->GetTableHeap()->Begin(nullptr); iter != my_table_info->GetTableHeap()->End();
-                iter++) {
-                int now = my_conditions.size() - 1;
-                Row my_row = *iter;
-                //每一个row是否满足条件
-                bool first_flag = true;
-                bool all_satisfy;
-                bool this_satisfy;
-                while (1) {
-                    std::string tmp_condition = my_conditions[now]->val_;
-                    std::string tmp_compare = compare->val_;
-                    string compare_column_name = compare->child_->val_;
-                    string expect_val = compare->child_->next_->val_;
-                    TypeId tmp_type;
-                    uint32_t j;
-                    for (j = 0; j < my_columns.size(); j++) {
-                        if (compare_column_name == my_columns[j]->GetName()) {
-                            tmp_type = my_columns[j]->GetType();
-                            break;
-                        }
-                    }
-                    Field* real_field = my_row.GetField(j);
-                    Field* tmp_field;
-                    if (tmp_type == kTypeInt) {
-                        int32_t tmp_compare_val = stoi(expect_val);
-                        tmp_field =  new Field(kTypeInt, tmp_compare_val);
-                    }
-                    else if (tmp_type == kTypeFloat) {
-                        int32_t tmp_compare_val = stof(expect_val);
-                        tmp_field = new Field(kTypeFloat, tmp_compare_val);
-                    }
-                    else if (tmp_type == kTypeChar) {
-                      char *tmp_compare_val = compare->child_->next_->val_;
-                      /*if (tmp_compare_val[strlen(tmp_compare_val) - 1] == '\b') {
-                        tmp_compare_val[strlen(tmp_compare_val) - 1] = '\0';
-                      }*/
-                      tmp_field = new Field(kTypeChar, tmp_compare_val, strlen(tmp_compare_val), false);
-                    }
-                    else {
-                        //数据类型有误
-                        return DB_FAILED;
-                    }
-                    if (tmp_compare == "=") {
-                        this_satisfy = real_field->CompareEquals(*tmp_field);
-                    }
-                    else if (tmp_compare == ">") {
-                        this_satisfy = real_field->CompareGreaterThan(*tmp_field);
-                    }
-                    else if (tmp_compare == "<") {
-                        this_satisfy = real_field->CompareLessThan(*tmp_field);
-                    }
-                    else if (tmp_compare == ">=") {
-                        this_satisfy = real_field->CompareGreaterThanEquals(*tmp_field);
-                    }
-                    else if (tmp_compare == "<=") {
-                        this_satisfy = real_field->CompareLessThanEquals(*tmp_field);
-                    }
-                    else if (tmp_compare == "<>") {
-                        this_satisfy = real_field->CompareNotEquals(*tmp_field);
-                    }
-                    else {
-                        //比较符号错误
-                        return DB_FAILED;
-                    }
-                    //第一个条件
-                    if (first_flag == true) {
-                        all_satisfy = this_satisfy;
-                        first_flag = false;
-                    }
-                    //后续的累加条件
-                    else {
-                        if (tmp_condition == "and") {
-                            all_satisfy = all_satisfy && this_satisfy;
-                        }
-                        else if (tmp_condition == "or") {
-                            all_satisfy = all_satisfy || this_satisfy;
-                        }
-                        else {
-                            //传入了and和or以外的参数
-                            return DB_FAILED;
-                        }
-                        now--;
-                        if (now < 0) {
-                          break;
-                        }
-                    }
-                    compare = my_conditions[now]->child_->next_;
-                }
-                if (all_satisfy == true) {
-                    select_rows.push_back(my_row);
-                }
-            }
+        std::vector<pSyntaxNode> conditions;
+        std::string oper, col_name, val;
+
+        //get the leftest node
+        std::string tmp_val = compare->val_;
+        while (tmp_val == "and" || tmp_val == "or") {
+          conditions.push_back(compare);
+          compare = compare->child_;
+          tmp_val = compare->val_;
         }
-        //没有and和or
-        else {
-            for (auto iter = my_table_info->GetTableHeap()->Begin(nullptr); iter != my_table_info->GetTableHeap()->End();
-                iter++) {
-                Row my_row = *iter;
-                //每一个row是否满足条件
-                bool all_satisfy;
-                bool this_satisfy;
-                std::string tmp_compare = compare->val_;
-                string compare_column_name = compare->child_->val_;
-                string expect_val = compare->child_->next_->val_;
-                TypeId tmp_type;
-                uint32_t j;
-                for (j = 0; j < my_columns.size(); j++) {
-                    if (compare_column_name == my_columns[j]->GetName()) {
-                        tmp_type = my_columns[j]->GetType();
-                        break;
-                    }
-                }
-                Field* real_field = my_row.GetField(j);
-                Field* tmp_field;
-                if (tmp_type == kTypeInt) {
-                  int32_t tmp_compare_val = stoi(expect_val);
-                  tmp_field = new Field(kTypeInt, tmp_compare_val);
-                }
-                else if (tmp_type == kTypeFloat) {
-                  float tmp_compare_val = stof(expect_val);
-                  tmp_field = new Field(kTypeFloat, tmp_compare_val);
-                }
-                else if (tmp_type == kTypeChar) {
-                  tmp_field = new Field(kTypeChar, compare->child_->next_->val_, expect_val.length(), false);
-                }
-                else {
-                    //数据类型有误
-                    return DB_FAILED;
-                }
-                if (tmp_compare == "=") {
-                    this_satisfy = real_field->CompareEquals(*tmp_field);
-                }
-                else if (tmp_compare == ">") {
-                    this_satisfy = real_field->CompareGreaterThan(*tmp_field);
-                }
-                else if (tmp_compare == "<") {
-                    this_satisfy = real_field->CompareLessThan(*tmp_field);
-                }
-                else if (tmp_compare == ">=") {
-                    this_satisfy = real_field->CompareGreaterThanEquals(*tmp_field);
-                }
-                else if (tmp_compare == "<=") {
-                    this_satisfy = real_field->CompareLessThanEquals(*tmp_field);
-                }
-                else if (tmp_compare == "<>") {
-                    this_satisfy = real_field->CompareNotEquals(*tmp_field);
-                }
-                else {
-                    //比较符号错误
-                    return DB_FAILED;
-                }
-                //总共就一个条件
-                all_satisfy = this_satisfy;
-                if (all_satisfy == true) {
-                    select_rows.push_back(my_row);
-                }
-            }
+        
+        std::vector<Row> base_set;
+        std::vector<Row> another_set;
+        //1. get the base
+        oper = compare->val_;
+        col_name = compare->child_->val_;
+        val = compare->child_->next_->val_;
+        GetRowSet(database_now, base_set, my_table_info, oper, col_name, val, local_heap);
+        select_rows = base_set;
+        //2. has at least one condition
+        while (conditions.empty() == false) {
+          select_rows.clear();
+          condition = conditions.back();
+          conditions.pop_back();
+          compare = condition->child_->next_;
+          oper = compare->val_;
+          col_name = compare->child_->val_;
+          val = compare->child_->next_->val_;
+          GetRowSet(database_now, another_set, my_table_info, oper, col_name, val, local_heap);
+          //union / intersect
+          tmp_val = condition->val_;
+          if (tmp_val == "and")
+            Intersect(base_set, another_set, select_rows);
+          else if (tmp_val == "or")
+            Union(base_set, another_set, select_rows);
+
+          base_set = select_rows;
         }
+        
     }
+
     if (all_columns == true) {
       for (auto i : select_rows) {
         for (auto j : i.GetFields()) {
@@ -647,8 +570,12 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext* context) {
     }
 
     for (auto i : select_rows) {
+      int count = 0;
       for (auto j : i.GetFields()) {
-        std::cout << j->GetData() << "\t";
+        if (column_map.find(count)!=column_map.end())
+            std::cout << j->GetData() << "\t";
+
+        count++;
       }
       std::cout << std::endl;
     }
@@ -662,6 +589,7 @@ dberr_t ExecuteEngine::ExecuteInsert(pSyntaxNode ast, ExecuteContext* context) {
     return DB_FAILED;*/
     if (current_db_ == "") {
         //未选择database
+      std::cerr << "no db is chosen\n";
         return DB_FAILED;
     }
     DBStorageEngine* database_now = dbs_[current_db_];
@@ -687,13 +615,10 @@ dberr_t ExecuteEngine::ExecuteInsert(pSyntaxNode ast, ExecuteContext* context) {
                 return DB_FAILED;
             }
             else {
-                Field* tmp_field;
-                tmp_field = new Field(my_columns[i]->GetType());
-                my_fields.push_back(*tmp_field);
+              my_fields.push_back(Field(my_columns[i]->GetType()));
             }
         }
         else {
-            Field* tmp_field;
             if (tmp_type == kTypeInt) {
                 string tmp_val = column_value->val_;
                 for (uint32_t j = 0; j < tmp_val.length(); j++) {
@@ -702,7 +627,7 @@ dberr_t ExecuteEngine::ExecuteInsert(pSyntaxNode ast, ExecuteContext* context) {
                         return DB_FAILED;
                     }
                 }
-                tmp_field = new Field(kTypeInt, stoi(column_value->val_));
+                my_fields.push_back(Field(kTypeInt, stoi(column_value->val_)));
             }
             else if (tmp_type == kTypeFloat) {
                 string tmp_val = column_value->val_;
@@ -713,7 +638,7 @@ dberr_t ExecuteEngine::ExecuteInsert(pSyntaxNode ast, ExecuteContext* context) {
                     }
                 }
                 float tmp_float = stof(column_value->val_);
-                tmp_field = new Field(kTypeFloat, tmp_float);
+                my_fields.push_back(Field(kTypeFloat, tmp_float));
             }
             else if (tmp_type == kTypeInvalid) {
                 //无效类型
@@ -728,9 +653,8 @@ dberr_t ExecuteEngine::ExecuteInsert(pSyntaxNode ast, ExecuteContext* context) {
                 else {
                     manage = true;
                 }
-                tmp_field = new Field(kTypeChar, tmp_val, strlen(tmp_val), manage);
+                my_fields.push_back(Field(kTypeChar, tmp_val, strlen(tmp_val), manage));
             }
-            my_fields.push_back(*tmp_field);
         }
         i++;
         column_value = column_value->next_;
@@ -738,93 +662,232 @@ dberr_t ExecuteEngine::ExecuteInsert(pSyntaxNode ast, ExecuteContext* context) {
     if (column_value != NULL) {
         std::cout << "Too many elements!" << std::endl;
     }
-    Row* my_row = new Row(my_fields);
-    //get pks
-    for (auto i : my_table_info->GetSchema()->GetPks()) {
-      if (my_row->GetField(i->GetTableInd())->IsNull() == true) {
-        std::cerr << "PK IS NULL\n";
-        return DB_FAILED;
-      }
-      pk_fields.push_back(*(my_row->GetField(i->GetTableInd())));
-    }
-    Row pk = Row(pk_fields);
-    // 主键/unique判断
-    //1. check the pk
-    if (((*(database_now->catalog_mgr_->GetIndexNames_()))[table_name]).find(PKINDEX) ==
-        ((*(database_now->catalog_mgr_->GetIndexNames_()))[table_name]).end()) {
-      std::cerr << "PK INDEX CANNT FIND\n";
-      return DB_FAILED;
-    }
+    Row *my_row = new Row(my_fields);
+    dberr_t ret_val = Insert(database_now, my_table_info, my_row);
+    delete my_row;
 
-    index_id_t tmp_index_id = ((*(database_now->catalog_mgr_->GetIndexNames_()))[table_name])[PKINDEX];
-    if (database_now->catalog_mgr_->GetIndexs_()->find(tmp_index_id) ==
-        database_now->catalog_mgr_->GetIndexs_()->end()) {
-      std::cerr << "PK INDEX CANNT FIND\n";
-      return DB_FAILED;
-    }
-
-    IndexInfo *tmp_index = (*(database_now->catalog_mgr_->GetIndexs_()))[tmp_index_id];
-    std::vector<RowId> tmp_result;
-    tmp_index->GetIndex()->ScanKey(pk, tmp_result, nullptr);
-    if (tmp_result.empty() != true) {
-      std::cerr << "PK Already exists\n";
-      return DB_FAILED;
-    }
-
-    //2. check the unique
-    for (auto i = my_table_info->GetSchema()->GetColumns().begin();
-         i != my_table_info->GetSchema()->GetColumns().end();i++) {
-      int count = 1;
-      if ((*i)->IsUnique() == true) {
-        tmp_index_id =
-            ((*(database_now->catalog_mgr_->GetIndexNames_()))[table_name])[UNIQUE_INDEX + std::to_string(count)];
-        tmp_index = (*(database_now->catalog_mgr_->GetIndexs_()))[tmp_index_id];
-        tmp_result.clear();
-        pk_fields.clear();
-        pk_fields.push_back(*(my_row->GetField((*i)->GetTableInd())));
-        Row key = Row(pk_fields);
-        tmp_index->GetIndex()->ScanKey(key, tmp_result, nullptr);
-
-        if (tmp_result.empty() != true) {
-          std::cerr << "Unique item " << (*i)->GetName() << " Already exists\n ";
-          return DB_FAILED;
-        }
-
-        count++;
-      }
-    }
-
-    //insert into table
-    my_table_info->GetTableHeap()->InsertTuple(*my_row, nullptr);
-    //insert into index
-    for (auto i = ((*(database_now->catalog_mgr_->GetIndexNames_()))[table_name]).begin();
-         i != ((*(database_now->catalog_mgr_->GetIndexNames_()))[table_name]).end(); i++) {
-      std::vector<Field> key_field;
-      tmp_index = (*(database_now->catalog_mgr_->GetIndexs_()))[i->second];
-      //get keys
-      for (auto j = tmp_index->GetIndexKeySchema()->GetColumns().begin();
-           j != tmp_index->GetIndexKeySchema()->GetColumns().end(); j++)
-        key_field.push_back(*(my_row->GetField((*j)->GetTableInd())));
-      Row key = Row(key_field);
-      (*(database_now->catalog_mgr_->GetIndexs_()))[i->second]->GetIndex()->InsertEntry(key, my_row->GetRowId(),
-                                                                                        nullptr);
-    }
-
-    return DB_SUCCESS;
+    return ret_val;
 }
 
 dberr_t ExecuteEngine::ExecuteDelete(pSyntaxNode ast, ExecuteContext* context) {
 #ifdef ENABLE_EXECUTE_DEBUG
     LOG(INFO) << "ExecuteDelete" << std::endl;
 #endif
-    return DB_FAILED;
+    SimpleMemHeap local_heap;
+    if (current_db_ == "") {
+      //未选择database
+      std::cerr << "no db is chosen\n";
+      return DB_FAILED;
+    }
+    DBStorageEngine *database_now = dbs_[current_db_];
+    //符合条件的row
+    std::vector<Row> select_rows;
+
+    // from xxx
+    // only one table is supported
+    std::string table_name = ast->child_->val_;
+    TableInfo *my_table_info = nullptr;
+    if (database_now->catalog_mgr_->GetTable(table_name, my_table_info) == DB_FAILED) {
+      //找不到该table
+      return DB_FAILED;
+    }
+
+    // from xxx后面没有where
+    if (ast->child_->next_ == NULL) {
+      for (auto iter = my_table_info->GetTableHeap()->Begin(nullptr); iter != my_table_info->GetTableHeap()->End();
+           iter++) {
+        Row my_row = *iter;
+        select_rows.push_back(my_row);
+      }
+    }
+    // from xxx后面有where
+    else {
+      pSyntaxNode condition = ast->child_->next_->child_;
+      pSyntaxNode compare = condition;
+      std::vector<pSyntaxNode> conditions;
+      std::string oper, col_name, val;
+
+      // get the leftest node
+      std::string tmp_val = compare->val_;
+      while (tmp_val == "and" || tmp_val == "or") {
+        conditions.push_back(compare);
+        compare = compare->child_;
+        tmp_val = compare->val_;
+      }
+
+      std::vector<Row> base_set;
+      std::vector<Row> another_set;
+      // 1. get the base
+      oper = compare->val_;
+      col_name = compare->child_->val_;
+      val = compare->child_->next_->val_;
+      GetRowSet(database_now, base_set, my_table_info, oper, col_name, val, local_heap);
+      select_rows = base_set;
+      // 2. has at least one condition
+      while (conditions.empty() == false) {
+        select_rows.clear();
+        condition = conditions.back();
+        conditions.pop_back();
+        compare = condition->child_->next_;
+        oper = compare->val_;
+        col_name = compare->child_->val_;
+        val = compare->child_->next_->val_;
+        GetRowSet(database_now, another_set, my_table_info, oper, col_name, val, local_heap);
+        // union / intersect
+        tmp_val = condition->val_;
+        if (tmp_val == "and")
+          Intersect(base_set, another_set, select_rows);
+        else if (tmp_val == "or")
+          Union(base_set, another_set, select_rows);
+
+        base_set = select_rows;
+      }
+    }
+
+    std::cout << select_rows.size() << " rows are effected\n";
+    IndexInfo *tmp_index;
+    for (auto z = select_rows.begin(); z != select_rows.end(); z++) {
+      // delete from table
+      my_table_info->GetTableHeap()->MarkDelete(z->GetRowId(), nullptr);
+      // delete from index
+      for (auto i = ((*(database_now->catalog_mgr_->GetIndexNames_()))[table_name]).begin();
+           i != ((*(database_now->catalog_mgr_->GetIndexNames_()))[table_name]).end(); i++) {
+        std::vector<Field> key_field;
+        tmp_index = (*(database_now->catalog_mgr_->GetIndexs_()))[i->second];
+        // get keys
+        for (auto j = tmp_index->GetIndexKeySchema()->GetColumns().begin();
+             j != tmp_index->GetIndexKeySchema()->GetColumns().end(); j++)
+          key_field.push_back(*(z->GetField((*j)->GetTableInd())));
+        Row key = Row(key_field);
+        (*(database_now->catalog_mgr_->GetIndexs_()))[i->second]->GetIndex()->RemoveEntry(key, z->GetRowId(), nullptr);
+      }
+    }
+    return DB_SUCCESS;
 }
 
 dberr_t ExecuteEngine::ExecuteUpdate(pSyntaxNode ast, ExecuteContext* context) {
 #ifdef ENABLE_EXECUTE_DEBUG
     LOG(INFO) << "ExecuteUpdate" << std::endl;
 #endif
-    return DB_FAILED;
+    SimpleMemHeap local_heap;
+    if (current_db_ == "") {
+      //未选择database
+      std::cerr << "no db is chosen\n";
+      return DB_FAILED;
+    }
+    DBStorageEngine *database_now = dbs_[current_db_];
+    //符合条件的row
+    std::vector<Row> select_rows;
+
+    // from xxx
+    // only one table is supported
+    std::string table_name = ast->child_->val_;
+    TableInfo *my_table_info = nullptr;
+    if (database_now->catalog_mgr_->GetTable(table_name, my_table_info) == DB_FAILED) {
+      //找不到该table
+      return DB_FAILED;
+    }
+
+    // get the new value
+    pSyntaxNode update_val = ast->child_->next_->child_;
+    std::vector<uint32_t> key_map;
+    std::vector<std::string> new_val;
+    std::string tmp_str;
+    while (update_val != nullptr) {
+      uint32_t index = 0;
+      if (my_table_info->GetSchema()->GetColumnIndex(update_val->child_->val_, index)) {
+        std::cerr << "No such column\n";
+        return DB_FAILED;
+      }
+      tmp_str = update_val->child_->next_->val_;
+      key_map.push_back(index);
+      new_val.push_back(tmp_str);
+
+      update_val = update_val->next_;
+    }
+
+    // from xxx后面没有where
+    if (ast->child_->next_->next_ == NULL) {
+      for (auto iter = my_table_info->GetTableHeap()->Begin(nullptr); iter != my_table_info->GetTableHeap()->End();
+           iter++) {
+        Row my_row = *iter;
+        select_rows.push_back(my_row);
+      }
+    }
+    // from xxx后面有where
+    else {
+      pSyntaxNode condition = ast->child_->next_->next_->child_;
+      pSyntaxNode compare = condition;
+      std::vector<pSyntaxNode> conditions;
+      std::string oper, col_name, val;
+
+      // get the leftest node
+      std::string tmp_val = compare->val_;
+      while (tmp_val == "and" || tmp_val == "or") {
+        conditions.push_back(compare);
+        compare = compare->child_;
+        tmp_val = compare->val_;
+      }
+
+      std::vector<Row> base_set;
+      std::vector<Row> another_set;
+      // 1. get the base
+      oper = compare->val_;
+      col_name = compare->child_->val_;
+      val = compare->child_->next_->val_;
+      GetRowSet(database_now, base_set, my_table_info, oper, col_name, val, local_heap);
+      select_rows = base_set;
+      // 2. has at least one condition
+      while (conditions.empty() == false) {
+        select_rows.clear();
+        condition = conditions.back();
+        conditions.pop_back();
+        compare = condition->child_->next_;
+        oper = compare->val_;
+        col_name = compare->child_->val_;
+        val = compare->child_->next_->val_;
+        GetRowSet(database_now, another_set, my_table_info, oper, col_name, val, local_heap);
+        // union / intersect
+        tmp_val = condition->val_;
+        if (tmp_val == "and")
+          Intersect(base_set, another_set, select_rows);
+        else if (tmp_val == "or")
+          Union(base_set, another_set, select_rows);
+
+        base_set = select_rows;
+      }
+    }
+
+    std::cout << select_rows.size() << " rows are effected\n";
+    //delete
+    IndexInfo *tmp_index;
+    for (auto z = select_rows.begin(); z != select_rows.end(); z++) {
+      // delete from table
+      my_table_info->GetTableHeap()->MarkDelete(z->GetRowId(), nullptr);
+      // delete from index
+      for (auto i = ((*(database_now->catalog_mgr_->GetIndexNames_()))[table_name]).begin();
+           i != ((*(database_now->catalog_mgr_->GetIndexNames_()))[table_name]).end(); i++) {
+        std::vector<Field> key_field;
+        tmp_index = (*(database_now->catalog_mgr_->GetIndexs_()))[i->second];
+        // get keys
+        for (auto j = tmp_index->GetIndexKeySchema()->GetColumns().begin();
+             j != tmp_index->GetIndexKeySchema()->GetColumns().end(); j++)
+          key_field.push_back(*(z->GetField((*j)->GetTableInd())));
+        Row key = Row(key_field);
+        (*(database_now->catalog_mgr_->GetIndexs_()))[i->second]->GetIndex()->RemoveEntry(key, z->GetRowId(), nullptr);
+      }
+    }
+    // prepare to insert
+    for (auto z = select_rows.begin(); z != select_rows.end(); z++) {
+      for (auto j = key_map.begin(); j != key_map.end();j++) {
+        z->GetFields()[*j] =
+            MakeField(new_val[j - key_map.begin()], my_table_info->GetSchema()->GetColumn(*j)->GetType(), local_heap);
+      }
+      // insert
+      Insert(database_now, my_table_info, &(*z));
+    }
+
+    return DB_SUCCESS;
 }
 
 dberr_t ExecuteEngine::ExecuteTrxBegin(pSyntaxNode ast, ExecuteContext* context) {
@@ -863,6 +926,7 @@ dberr_t ExecuteEngine::ExecuteExecfile(pSyntaxNode ast, ExecuteContext* context)
         char code[1024];
         while (!feof(txt)) {
             fscanf(txt, "%[^;]%*c", code);
+            if (feof(txt)) break;
             strcat(code, ";");
             YY_BUFFER_STATE bp = yy_scan_string(code);
             cout << "code = " << code << endl;
@@ -924,16 +988,18 @@ dberr_t ExecuteEngine::TransferPks(std::vector<std::string> &in, std::vector<Col
   return DB_SUCCESS;
 }
 //Where clouse
-Field *MakeField(std::string &expect_val, TypeId tmp_type) {  
+Field *ExecuteEngine::MakeField(std::string &expect_val, TypeId tmp_type,SimpleMemHeap &heap) {  
   Field *tmp_field;
   if (tmp_type == kTypeInt) {
     int32_t tmp_compare_val = stoi(expect_val);
-    tmp_field = new Field(kTypeInt, tmp_compare_val);
+    tmp_field = new (heap.Allocate(sizeof(Field(kTypeInt, tmp_compare_val)))) Field(kTypeInt, tmp_compare_val);
   } else if (tmp_type == kTypeFloat) {
     float tmp_compare_val = stof(expect_val);
-    tmp_field = new Field(kTypeFloat, tmp_compare_val);
+    tmp_field = new (heap.Allocate(sizeof(Field(kTypeFloat, tmp_compare_val)))) Field(kTypeFloat, tmp_compare_val);
   } else if (tmp_type == kTypeChar) {
-    tmp_field = new Field(kTypeChar, const_cast<char*>(expect_val.c_str()), expect_val.length(), false);
+    tmp_field = new (
+        heap.Allocate(sizeof(Field(kTypeChar, const_cast<char *>(expect_val.c_str()), expect_val.length(), false))))
+        Field(kTypeChar, const_cast<char *>(expect_val.c_str()), expect_val.length(), false);
   } else {
     //数据类型有误
     return nullptr;
@@ -942,8 +1008,9 @@ Field *MakeField(std::string &expect_val, TypeId tmp_type) {
   return tmp_field;
 }
 
-dberr_t GetRowSet(DBStorageEngine *database_now,std::vector<Row> &result, TableInfo *table, std::string &condition,
-               string compare_column_name,std::string &val) {
+dberr_t ExecuteEngine::GetRowSet(DBStorageEngine *database_now, std::vector<Row> &result, TableInfo *table,
+                                 std::string &condition,
+               string compare_column_name,std::string &val,SimpleMemHeap &heap) {
   //get the column
   Column *target = nullptr;
   for (auto i = table->GetSchema()->GetColumns().begin(); i != table->GetSchema()->GetColumns().end();i++) {
@@ -959,7 +1026,7 @@ dberr_t GetRowSet(DBStorageEngine *database_now,std::vector<Row> &result, TableI
   //try to find a index
   auto vec = &((*(database_now->catalog_mgr_->GetIndexNames_()))[table->GetTableName()]);
   auto i = vec->begin();
-  for (i; i != vec->end(); i++) {
+  for (; i != vec->end(); i++) {
     uint32_t num = 0;
     if (((*(database_now->catalog_mgr_->GetIndexs_()))[i->second])->GetIndexKeySchema()->GetColumnCount() == 1 &&
         ((*(database_now->catalog_mgr_->GetIndexs_()))[i->second])
@@ -969,7 +1036,7 @@ dberr_t GetRowSet(DBStorageEngine *database_now,std::vector<Row> &result, TableI
     }
   }
   //get the key
-  Field *key_f = MakeField(val, target->GetType());
+  Field *key_f = MakeField(val, target->GetType(), heap);
   Field *record_field = nullptr;
   if (key_f == nullptr) {
     std::cerr << "Field make failed\n";
@@ -1025,9 +1092,11 @@ dberr_t GetRowSet(DBStorageEngine *database_now,std::vector<Row> &result, TableI
       if (record_field->CompareNotEquals(*key_f) == true) result.push_back(*i);
     }
   }
+
+  return DB_SUCCESS;
 }
 
-void Intersect(std::vector<Row> &a, std::vector<Row> &b, std::vector<Row> &result) {
+void ExecuteEngine::Intersect(std::vector<Row> &a, std::vector<Row> &b, std::vector<Row> &result) {
   std::unordered_map<int64_t, Row *> map;
   for (auto i = a.begin(); i != a.end(); i++) {
     map.insert(make_pair((i->GetRowId().Get()), &(*i)));
@@ -1042,7 +1111,7 @@ void Intersect(std::vector<Row> &a, std::vector<Row> &b, std::vector<Row> &resul
   }
 }
 
-void Union(std::vector<Row> &a, std::vector<Row> &b, std::vector<Row> &result) {
+void ExecuteEngine::Union(std::vector<Row> &a, std::vector<Row> &b, std::vector<Row> &result) {
   std::unordered_map<int64_t, Row *> map;
   for (auto i = a.begin(); i != a.end(); i++) {
     map.insert(make_pair((i->GetRowId().Get()), &(*i)));
@@ -1056,4 +1125,78 @@ void Union(std::vector<Row> &a, std::vector<Row> &b, std::vector<Row> &result) {
       result.push_back(*i);
     }
   }
+}
+
+dberr_t ExecuteEngine::Insert(DBStorageEngine *database_now, TableInfo *my_table_info, Row *my_row) {
+  // get pks
+  vector<Field> pk_fields;
+  for (auto i : my_table_info->GetSchema()->GetPks()) {
+    if (my_row->GetField(i->GetTableInd())->IsNull() == true) {
+      std::cerr << "PK IS NULL\n";
+      return DB_FAILED;
+    }
+    pk_fields.push_back(*(my_row->GetField(i->GetTableInd())));
+  }
+  Row pk = Row(pk_fields);
+  // 主键/unique判断
+  // 1. check the pk
+  if (((*(database_now->catalog_mgr_->GetIndexNames_()))[my_table_info->GetTableName()]).find(PKINDEX) ==
+      ((*(database_now->catalog_mgr_->GetIndexNames_()))[my_table_info->GetTableName()]).end()) {
+    std::cerr << "PK INDEX CANNT FIND\n";
+    return DB_FAILED;
+  }
+
+  index_id_t tmp_index_id = ((*(database_now->catalog_mgr_->GetIndexNames_()))[my_table_info->GetTableName()])[PKINDEX];
+  if (database_now->catalog_mgr_->GetIndexs_()->find(tmp_index_id) == database_now->catalog_mgr_->GetIndexs_()->end()) {
+    std::cerr << "PK INDEX CANNT FIND\n";
+    return DB_FAILED;
+  }
+
+  IndexInfo *tmp_index = (*(database_now->catalog_mgr_->GetIndexs_()))[tmp_index_id];
+  std::vector<RowId> tmp_result;
+  tmp_index->GetIndex()->ScanKey(pk, tmp_result, nullptr);
+  if (tmp_result.empty() != true) {
+    std::cerr << "PK Already exists\n";
+    return DB_FAILED;
+  }
+
+  // 2. check the unique
+  for (auto i = my_table_info->GetSchema()->GetColumns().begin(); i != my_table_info->GetSchema()->GetColumns().end();
+       i++) {
+    int count = 1;
+    if ((*i)->IsUnique() == true) {
+      tmp_index_id = ((*(database_now->catalog_mgr_
+                             ->GetIndexNames_()))[my_table_info->GetTableName()])[UNIQUE_INDEX + std::to_string(count)];
+      tmp_index = (*(database_now->catalog_mgr_->GetIndexs_()))[tmp_index_id];
+      tmp_result.clear();
+      pk_fields.clear();
+      pk_fields.push_back(*(my_row->GetField((*i)->GetTableInd())));
+      Row key = Row(pk_fields);
+      tmp_index->GetIndex()->ScanKey(key, tmp_result, nullptr);
+
+      if (tmp_result.empty() != true) {
+        std::cerr << "Unique item " << (*i)->GetName() << " Already exists\n ";
+        return DB_FAILED;
+      }
+
+      count++;
+    }
+  }
+
+  // insert into table
+  my_table_info->GetTableHeap()->InsertTuple(*my_row, nullptr);
+  // insert into index
+  for (auto i = ((*(database_now->catalog_mgr_->GetIndexNames_()))[my_table_info->GetTableName()]).begin();
+       i != ((*(database_now->catalog_mgr_->GetIndexNames_()))[my_table_info->GetTableName()]).end(); i++) {
+    std::vector<Field> key_field;
+    tmp_index = (*(database_now->catalog_mgr_->GetIndexs_()))[i->second];
+    // get keys
+    for (auto j = tmp_index->GetIndexKeySchema()->GetColumns().begin();
+         j != tmp_index->GetIndexKeySchema()->GetColumns().end(); j++)
+      key_field.push_back(*(my_row->GetField((*j)->GetTableInd())));
+    Row key = Row(key_field);
+    (*(database_now->catalog_mgr_->GetIndexs_()))[i->second]->GetIndex()->InsertEntry(key, my_row->GetRowId(), nullptr);
+  }
+
+  return DB_SUCCESS;
 }

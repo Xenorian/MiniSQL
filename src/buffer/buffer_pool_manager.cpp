@@ -62,7 +62,11 @@ Page *BufferPoolManager::NewPage(page_id_t &page_id) {
   int all_pin = 0;
   if (free_list_.size() != 0) all_pin++;
   if (replacer_->Size() != 0) all_pin++;
-  if (all_pin == 0) return nullptr;
+  if (all_pin == 0) {
+    std::cerr << "FULL\n";
+    exit(2);
+    return nullptr;
+  }
 
   page_id = disk_manager_->AllocatePage();
   // 2.   Pick a victim page P from either the free list or the replacer. Always pick from the free list first.
