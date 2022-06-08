@@ -589,7 +589,7 @@ dberr_t ExecuteEngine::ExecuteInsert(pSyntaxNode ast, ExecuteContext* context) {
     return DB_FAILED;*/
     if (current_db_ == "") {
         //未选择database
-      std::cerr << "no db is chosen\n";
+        std::cerr << "no db is chosen\n";
         return DB_FAILED;
     }
     DBStorageEngine* database_now = dbs_[current_db_];
@@ -599,7 +599,7 @@ dberr_t ExecuteEngine::ExecuteInsert(pSyntaxNode ast, ExecuteContext* context) {
     vector<Field> my_fields;
     vector<Field> pk_fields;
     pSyntaxNode column_value = ast->child_->next_->child_;
-    if (database_now->catalog_mgr_->GetTable(table_name, my_table_info) == DB_FAILED) {
+    if (database_now->catalog_mgr_->GetTable(table_name, my_table_info)) {
         //找不到该table
         return DB_FAILED;
     }
