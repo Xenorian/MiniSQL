@@ -51,7 +51,6 @@ public:
   DiskManager *disk_mgr_;
   BufferPoolManager *bpm_;
   CatalogManager *catalog_mgr_;
-  SimpleMemHeap global_heap;
   std::string db_file_name_;
   bool init_;
 };

@@ -11,6 +11,8 @@
 class Field {
   friend class Type;
 
+  friend class Row;
+
   friend class TypeInt;
 
   friend class TypeChar;
@@ -129,6 +131,8 @@ public:
   inline CmpBool CompareGreaterThanEquals(const Field &o) const {
     return Type::GetInstance(type_id_)->CompareGreaterThanEquals(*this, o);
   }
+
+  inline TypeId GetType() { return type_id_; }
 
   friend void Swap(Field &first, Field &second) {
     std::swap(first.value_, second.value_);

@@ -112,7 +112,7 @@ private:
 
   dberr_t GetTable(const table_id_t table_id, TableInfo *&table_info);
 
-private:
+ private:
   [[maybe_unused]] BufferPoolManager *buffer_pool_manager_;
   [[maybe_unused]] LockManager *lock_manager_;
   [[maybe_unused]] LogManager *log_manager_;
@@ -125,6 +125,8 @@ private:
   // map for indexes: table_name->index_name->indexes
   [[maybe_unused]] std::unordered_map<std::string, std::unordered_map<std::string, index_id_t>> index_names_;
   [[maybe_unused]] std::unordered_map<index_id_t, IndexInfo *> indexes_;
+
+ public:
   // memory heap
   MemHeap *heap_;
 };

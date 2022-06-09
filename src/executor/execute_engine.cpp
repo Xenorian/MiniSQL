@@ -328,14 +328,13 @@ dberr_t ExecuteEngine::ExecuteCreateTable(pSyntaxNode ast, ExecuteContext* conte
                 type = kTypeInvalid;
             }
             if (type == kTypeChar) {
-              Column *tmp =
-                  new (database_now->global_heap.Allocate(sizeof(Column(column_name, type, length, index, nullable, unique))))
+              Column *tmp = new (database_now->catalog_mgr_->heap_->Allocate(sizeof(Column(column_name, type, length, index, nullable, unique))))
                       Column(column_name, type, length, index, nullable, unique);
                 column_definition.push_back(tmp);
             }
             else {
-              Column *tmp =
-                  new (database_now->global_heap.Allocate(sizeof(Column(column_name, type, index, nullable, unique))))
+              Column *tmp = new (
+                  database_now->catalog_mgr_->heap_->Allocate(sizeof(Column(column_name, type, index, nullable, unique))))
                       Column(column_name, type, index, nullable, unique);
                 column_definition.push_back(tmp);
             }

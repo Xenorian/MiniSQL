@@ -49,7 +49,8 @@ uint32_t Row::DeserializeFrom(char *buf, Schema *schema) {
   uint32_t size = MACH_READ_UINT32(tmp);
   tmp += sizeof(uint32_t);
   size_t i = 0;
-  bool *null_map = new bool[size];
+  bool *null_map = static_cast<bool *>((heap_->Allocate(sizeof(bool[size]))));
+
   for (i = 0; i < size; i++) {
     null_map[i] = MACH_READ_FROM(bool, tmp);
     tmp += sizeof(bool);

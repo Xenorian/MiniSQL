@@ -94,7 +94,14 @@ public:
 
   inline size_t GetFieldCount() const { return fields_.size(); }
 
-  Row &operator=(const Row &other) { 
+  Row &operator=(const Row &other) {
+    if (!fields_.empty()) {
+      for (auto &field : fields_) {
+        heap_->Free(field);
+      }
+      fields_.clear();
+    }
+
     rid_ = other.GetRowId();
     for (auto i : other.GetFields_read_only()) {
       fields_.push_back(new (heap_->Allocate(sizeof(*i))) Field(*i));
