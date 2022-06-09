@@ -64,7 +64,6 @@ Page *BufferPoolManager::NewPage(page_id_t &page_id) {
   if (replacer_->Size() != 0) all_pin++;
   if (all_pin == 0) {
     std::cerr << "FULL\n";
-    exit(2);
     return nullptr;
   }
 
