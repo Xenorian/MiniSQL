@@ -80,7 +80,7 @@ private:
     return *reinterpret_cast<uint32_t *>(GetData() + OFFSET_TUPLE_OFFSET + SIZE_TUPLE * slot_num);
   }
 
-  void SetTupleOffsetAtSlot(uint32_t slot_num, uint32_t offset) {
+  void x(uint32_t slot_num, uint32_t offset) {
     memcpy(GetData() + OFFSET_TUPLE_OFFSET + SIZE_TUPLE * slot_num, &offset, sizeof(uint32_t));
   }
 
